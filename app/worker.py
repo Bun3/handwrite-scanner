@@ -76,10 +76,14 @@ def _recognize_with_template(job_id, st, tpl, data, page_no, total_pages,
         x, y, w, h = f["box"]
         crop = aligned.crop((max(0, x - PAD), max(0, y - PAD),
                              x + w + PAD, y + h + PAD))
+        if crop.width < 1000:  # 작은 crop은 VLM 인식률이 떨어짐 → 업스케일
+            s = min(3, 1000 / crop.width)
+            crop = crop.resize((int(crop.width * s), int(crop.height * s)))
         buf = io.BytesIO()
         crop.save(buf, "PNG")
         raw = llm.ask_image(buf.getvalue(), _prompt(f))
         value, conf = _post(raw, f)
+        value, conf = _second_pass(buf.getvalue(), f, value, conf)
         out.append({"id": f["id"], "label": f["label"], "type": f["type"],
                     "box": f["box"], "raw": raw, "value": value,
                     "confidence": round(conf, 2)})
@@ -95,7 +99,9 @@ def _prompt(f: dict) -> str:
     base = (f"이 이미지는 문서 양식에서 '{label}' 칸을 잘라낸 것이다. "
             "인쇄된 라벨은 무시하고 손으로 쓴 내용만 읽어라. ")
     if t == "phone":
-        base += "전화번호다. 숫자와 하이픈만 출력하라. "
+        base += ("전화번호다. 휴대전화면 하이픈 제외 정확히 숫자 11개다. "
+                 "겹치거나 붙어 쓰인 숫자도 각각 세어 모두 읽어라. "
+                 "숫자와 하이픈만 출력하라. ")
     elif t == "number":
         base += "숫자다. 숫자만 출력하라. "
     elif f.get("candidates"):
@@ -110,6 +116,28 @@ def _post(raw: str, f: dict) -> tuple[str, float]:
     if f["type"] == "circle" or (f.get("candidates") and f["type"] != "text_free"):
         return postprocess.match_candidate(raw, f.get("candidates") or [])
     return postprocess.validate(raw, f["type"])
+
+
+def _second_pass(crop_png: bytes, f: dict, value: str, conf: float):
+    """1차 인식의 흔한 오독을 검증하는 2차 처리.
+
+    - number + min/max 선언: 범위 밖이면 한글 손글씨 삐침(1 오인) 보정
+    - phone: 마지막 자리가 혼동 쌍(7/9)이면 이지선다 재질문으로 확정
+    """
+    if f["type"] == "number" and ("min" in f or "max" in f):
+        value, conf = postprocess.clamp_number(
+            value, conf, f.get("min", 0), f.get("max", 10 ** 9))
+    elif f["type"] == "phone":
+        digits = value.replace("-", "")
+        if len(digits) == 11 and digits[-1] in "79":
+            ans = llm.ask_image(crop_png, (
+                "이 전화번호의 마지막 숫자는 7인가 9인가? "
+                "위쪽에 작은 고리(원)가 있으면 9, 각진 꺾임이면 7이다. "
+                "숫자 하나만 출력하라."))
+            d = ans.strip()[-1:]
+            if d in "79" and d != digits[-1]:
+                value = value[:-1] + d
+    return value, conf
 
 
 def _recognize_freeform(data: bytes) -> list:

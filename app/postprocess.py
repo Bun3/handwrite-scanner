@@ -55,3 +55,19 @@ def validate(text: str, field_type: str) -> tuple[str, float]:
         digits = re.sub(r"\D", "", t.translate(_DIGIT_FIX))
         return (digits, 0.9) if digits else (t, 0.3)
     return t, 0.7  # text 등: 형식 검증 없음
+
+
+def clamp_number(value: str, conf: float, lo: int, hi: int) -> tuple[str, float]:
+    """범위 제약 검증. 범위 밖 + 선행 1 은 한글 손글씨 7의 삐침 오인으로 보정.
+
+    ponytail: 삐침 보정은 선행 1 제거뿐인 단순 휴리스틱 — 오독 유형이 늘면
+    이지선다 재질문으로 확장.
+    """
+    if not value.isdigit():
+        return value, conf
+    n = int(value)
+    if lo <= n <= hi:
+        return value, conf
+    if len(value) > 1 and value[0] == "1" and lo <= int(value[1:]) <= hi:
+        return value[1:], 0.55  # 검수 강조선(0.7) 아래로
+    return value, 0.3

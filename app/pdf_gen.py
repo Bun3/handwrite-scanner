@@ -35,6 +35,9 @@ def _searchable(job_id: str, res: list, out) -> None:
                 continue
             x, y, bw, bh = f["box"]
             size = max(6, bh * scale * 0.6)
+            tw = pdfmetrics.stringWidth(f["value"], "Malgun", size)
+            if tw > bw * scale:  # 박스 폭 초과 시 축소 (검색·복사가 목적이라 크기보다 완전성)
+                size = max(4, size * bw * scale / tw)
             t = c.beginText(x * scale, ph - (y + bh * 0.8) * scale)
             t.setFont("Malgun", size)
             t.setTextRenderMode(3)  # invisible

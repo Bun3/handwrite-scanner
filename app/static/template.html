@@ -115,7 +115,12 @@ function renderFields() {
       <td><textarea rows="1" style="width:100%" placeholder="후보목록/동그라미 타입만"
         onchange="fields[${i}].candidates=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${(f.candidates || []).join('\n')}</textarea></td>
       <td><textarea rows="1" style="width:100%" placeholder="모델에게 줄 추가 설명"
-        onchange="fields[${i}].hint=this.value.trim()">${f.hint || ''}</textarea></td>
+        onchange="fields[${i}].hint=this.value.trim()">${f.hint || ''}</textarea>
+        ${f.type === 'number' ? `<div class="hint">범위:
+          <input type="number" style="width:60px" value="${f.min ?? ''}" placeholder="min"
+            onchange="fields[${i}].min=this.value===''?undefined:+this.value">~
+          <input type="number" style="width:60px" value="${f.max ?? ''}" placeholder="max"
+            onchange="fields[${i}].max=this.value===''?undefined:+this.value"></div>` : ''}</td>
       <td><button class="danger" onclick="fields.splice(${i},1);renderFields();draw()">삭제</button></td>`;
   });
   draw();

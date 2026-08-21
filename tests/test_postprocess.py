@@ -36,3 +36,12 @@ def test_validate_number():
 
 def test_validate_text_passthrough():
     assert validate("개인  사유", "text")[0] == "개인 사유"
+
+
+def test_clamp_number():
+    from app.postprocess import clamp_number
+    assert clamp_number("7", 0.9, 0, 11) == ("7", 0.9)          # 범위 내 유지
+    v, c = clamp_number("17", 0.9, 0, 11)                        # 삐침 보정
+    assert v == "7" and c < 0.7
+    assert clamp_number("25", 0.9, 0, 11)[1] == 0.3              # 보정 불가
+    assert clamp_number("abc", 0.9, 0, 11) == ("abc", 0.9)       # 숫자 아님

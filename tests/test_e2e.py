@@ -23,7 +23,7 @@ TRUTH = {
 
 def _server_up():
     try:
-        return httpx.get(BASE + "/api/health", timeout=2).status_code == 200
+        return httpx.get(BASE + "/api/health", timeout=10).status_code == 200
     except Exception:
         return False
 
