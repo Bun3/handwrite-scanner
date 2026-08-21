@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>검수 - handwrite-scanner</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header><b>handwrite-scanner</b>
+  <a href="/">작업</a><a href="template.html">템플릿</a>
+</header>
+<main>
+<div class="card">
+  <h3 id="title">검수</h3>
+  <div id="alignWarn" class="warn" style="display:none">
+    ⚠ 템플릿 정합에 실패해 단순 크기 맞춤으로 처리했습니다. 결과를 꼼꼼히 확인하세요.
+  </div>
+  <div id="list"></div>
+  <br>
+  <button onclick="pdf('searchable')">PDF 다운로드 (원본+텍스트층)</button>
+  <button class="secondary" onclick="pdf('text')">PDF 다운로드 (텍스트 재구성)</button>
+</div>
+</main>
+<script>
+const id = new URLSearchParams(location.search).get('id');
+document.getElementById('title').textContent = '검수 — ' + id;
+
+async function load() {
+  const d = await (await fetch('/api/jobs/' + id)).json();
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  for (const page of d.results) {
+    if (page.aligned === false) document.getElementById('alignWarn').style.display = '';
+    const pageImg = new Image();
+    pageImg.src = `/api/jobs/${id}/page/${page.page}`;
+    await new Promise(r => pageImg.onload = r);
+    const h = document.createElement('h4');
+    h.textContent = `${page.page + 1} 페이지`;
+    list.appendChild(h);
+    for (const f of page.fields) {
+      const row = document.createElement('div');
+      row.className = 'field-row' + (f.confidence < 0.7 ? ' low' : '');
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = f.label + (f.confidence < 0.7 ? ' ⚠' : '');
+      row.appendChild(label);
+      if (f.box) {
+        const [x, y, w, hh] = f.box, pad = 8;
+        const c = document.createElement('canvas');
+        const cw = Math.min(w + pad * 2, pageImg.width - x + pad), ch = hh + pad * 2;
+        c.width = cw; c.height = ch;
+        c.getContext('2d').drawImage(pageImg, x - pad, y - pad, cw, ch, 0, 0, cw, ch);
+        if (cw > 340) c.style.width = '340px';
+        row.appendChild(c);
+      }
+      const inp = document.createElement('input');
+      inp.value = f.value || '';
+      inp.title = 'LLM 원문: ' + (f.raw || '');
+      inp.onchange = async () => {
+        await fetch(`/api/jobs/${id}/fields`, { method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ page: page.page, id: f.id, value: inp.value }) });
+        row.classList.remove('low');
+        label.textContent = f.label;
+      };
+      row.appendChild(inp);
+      const conf = document.createElement('span');
+      conf.className = 'hint';
+      conf.textContent = (f.confidence * 100).toFixed(0) + '%';
+      row.appendChild(conf);
+      list.appendChild(row);
+    }
+  }
+}
+
+function pdf(kind) { location.href = `/api/jobs/${id}/pdf?kind=${kind}`; }
+load();
+</script>
+</body>
+</html>

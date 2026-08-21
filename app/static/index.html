@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>handwrite-scanner</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header><b>handwrite-scanner</b>
+  <a class="on" href="/">작업</a><a href="template.html">템플릿</a>
+  <span id="llm" class="hint"></span>
+</header>
+<main>
+<div class="card">
+  <h3>문서 사진 업로드</h3>
+  <div class="warn" id="tplHint" style="display:none">
+    템플릿 없이도 인식되지만, <a href="template.html">템플릿을 등록</a>하면 인식률이 크게 올라갑니다.
+  </div>
+  <form id="up">
+    <input type="file" name="files" multiple accept="image/*" required>
+    <select name="template" id="tplSel"><option value="">(템플릿 없음)</option></select>
+    <button>인식 시작</button>
+  </form>
+  <p class="hint">CPU에서 문서 1장당 몇 분 걸립니다. 여러 장을 걸어두고 나중에 검수하세요.</p>
+</div>
+<div class="card">
+  <h3>작업 목록</h3>
+  <table id="jobs"><tr><th>ID</th><th>템플릿</th><th>상태</th><th>진행</th><th></th></tr></table>
+</div>
+</main>
+<script>
+async function j(u, o) { const r = await fetch(u, o); return r.json(); }
+
+async function loadTpl() {
+  const tpls = await j('/api/templates');
+  document.getElementById('tplHint').style.display = tpls.length ? 'none' : '';
+  const sel = document.getElementById('tplSel');
+  for (const t of tpls) sel.add(new Option(t.name, t.name));
+}
+
+async function refresh() {
+  const jobs = await j('/api/jobs');
+  const tb = document.getElementById('jobs');
+  tb.innerHTML = '<tr><th>ID</th><th>템플릿</th><th>상태</th><th>진행</th><th></th></tr>';
+  for (const s of jobs) {
+    const tr = tb.insertRow();
+    tr.innerHTML = `<td>${s.id}</td><td>${s.template || '-'}</td>
+      <td><span class="badge ${s.state}">${s.state}</span></td>
+      <td>${s.progress || (s.error ? '오류' : '')}</td>
+      <td>${s.state === 'done' ? `<a href="review.html?id=${s.id}">검수/다운로드</a>` : ''}</td>`;
+  }
+}
+
+document.getElementById('up').onsubmit = async e => {
+  e.preventDefault();
+  await fetch('/api/jobs', { method: 'POST', body: new FormData(e.target) });
+  e.target.reset(); refresh();
+};
+
+async function health() {
+  const h = await j('/api/health');
+  document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 로딩 중(첫 작업 시 자동 기동)';
+}
+
+loadTpl(); refresh(); health(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>
