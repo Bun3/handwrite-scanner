@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>템플릿 편집 - handwrite-scanner</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header><b>handwrite-scanner</b>
+  <a href="/">작업</a><a class="on" href="template.html">템플릿</a>
+</header>
+<main>
+<div class="card">
+  <h3>템플릿</h3>
+  <select id="tplSel"><option value="">(새 템플릿)</option></select>
+  <input id="tplName" placeholder="템플릿 이름">
+  <input type="file" id="refFile" accept="image/*,.pdf">
+  <button onclick="createTpl()">기준 양식 등록</button>
+  <button class="danger" onclick="delTpl()">삭제</button>
+  <p class="hint">빈 양식 이미지나 PDF를 등록한 뒤, 이미지 위에 드래그로 필드 영역을 그리세요.</p>
+</div>
+<div class="card" id="editor" style="display:none">
+  <div id="canvasWrap"><canvas id="cv"></canvas></div>
+  <h3>필드 목록</h3>
+  <table id="fields"><tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr></table>
+  <br><button onclick="saveTpl()">저장</button> <span id="saved" class="hint"></span>
+</div>
+</main>
+<script>
+let name = '', fields = [], img = new Image(), scale = 1, drag = null;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+
+async function j(u, o) { const r = await fetch(u, o); return r.json(); }
+
+async function loadList() {
+  const sel = document.getElementById('tplSel');
+  sel.length = 1;
+  for (const t of await j('/api/templates')) sel.add(new Option(t.name, t.name));
+  const q = new URLSearchParams(location.search).get('name');
+  if (q) { sel.value = q; openTpl(q); }
+}
+
+document.getElementById('tplSel').onchange = e => e.target.value && openTpl(e.target.value);
+
+async function createTpl() {
+  const n = document.getElementById('tplName').value.trim();
+  const f = document.getElementById('refFile').files[0];
+  if (!n || !f) return alert('이름과 기준 양식 파일을 입력하세요');
+  const fd = new FormData(); fd.append('name', n); fd.append('file', f);
+  await fetch('/api/templates', { method: 'POST', body: fd });
+  await loadList(); document.getElementById('tplSel').value = n; openTpl(n);
+}
+
+async function openTpl(n) {
+  name = n;
+  const tpls = await j('/api/templates');
+  fields = (tpls.find(t => t.name === n) || {}).fields || [];
+  img = new Image();
+  img.onload = () => {
+    scale = Math.min(1, 950 / img.width);
+    cv.width = img.width * scale; cv.height = img.height * scale;
+    document.getElementById('editor').style.display = '';
+    draw(); renderFields();
+  };
+  img.src = `/api/templates/${encodeURIComponent(n)}/reference?` + Date.now();
+}
+
+function draw() {
+  ctx.drawImage(img, 0, 0, cv.width, cv.height);
+  ctx.font = '13px sans-serif';
+  fields.forEach((f, i) => {
+    const [x, y, w, h] = f.box.map(v => v * scale);
+    ctx.strokeStyle = '#e5322c'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = '#e5322c'; ctx.fillText(`${i + 1} ${f.label}`, x + 3, y - 4);
+  });
+  if (drag) {
+    ctx.strokeStyle = '#2c7be5';
+    ctx.strokeRect(drag.x, drag.y, drag.w, drag.h);
+  }
+}
+
+cv.onmousedown = e => {
+  const r = cv.getBoundingClientRect();
+  drag = { x: e.clientX - r.left, y: e.clientY - r.top, w: 0, h: 0 };
+};
+cv.onmousemove = e => {
+  if (!drag) return;
+  const r = cv.getBoundingClientRect();
+  drag.w = e.clientX - r.left - drag.x; drag.h = e.clientY - r.top - drag.y;
+  draw();
+};
+cv.onmouseup = () => {
+  if (drag && Math.abs(drag.w) > 8 && Math.abs(drag.h) > 8) {
+    const x = Math.min(drag.x, drag.x + drag.w) / scale,
+          y = Math.min(drag.y, drag.y + drag.h) / scale;
+    fields.push({ id: 'f' + Date.now(), label: '필드' + (fields.length + 1),
+      type: 'text', box: [Math.round(x), Math.round(y),
+        Math.round(Math.abs(drag.w) / scale), Math.round(Math.abs(drag.h) / scale)],
+      candidates: [] });
+    renderFields();
+  }
+  drag = null; draw();
+};
+
+const TYPES = { text: '자유텍스트', candidates: '후보목록', phone: '전화번호', number: '숫자', circle: '동그라미 선택' };
+
+function renderFields() {
+  const tb = document.getElementById('fields');
+  tb.innerHTML = '<tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr>';
+  fields.forEach((f, i) => {
+    const tr = tb.insertRow();
+    tr.innerHTML = `<td><input value="${f.label}" onchange="fields[${i}].label=this.value;draw()"></td>
+      <td><select onchange="fields[${i}].type=this.value">${Object.entries(TYPES).map(([k, v]) =>
+        `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td><textarea rows="1" style="width:100%" placeholder="후보목록/동그라미 타입만"
+        onchange="fields[${i}].candidates=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${(f.candidates || []).join('\n')}</textarea></td>
+      <td><textarea rows="1" style="width:100%" placeholder="모델에게 줄 추가 설명"
+        onchange="fields[${i}].hint=this.value.trim()">${f.hint || ''}</textarea>
+        ${f.type === 'number' ? `<div class="hint">범위:
+          <input type="number" style="width:60px" value="${f.min ?? ''}" placeholder="min"
+            onchange="fields[${i}].min=this.value===''?undefined:+this.value">~
+          <input type="number" style="width:60px" value="${f.max ?? ''}" placeholder="max"
+            onchange="fields[${i}].max=this.value===''?undefined:+this.value"></div>` : ''}</td>
+      <td><button class="danger" onclick="fields.splice(${i},1);renderFields();draw()">삭제</button></td>`;
+  });
+  draw();
+}
+
+async function saveTpl() {
+  // 저장 시 candidates 타입인데 후보가 비면 text로 강등하지 않고 그대로 저장(엔진이 무시)
+  await fetch('/api/templates/' + encodeURIComponent(name), {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields })
+  });
+  document.getElementById('saved').textContent = '저장됨 ' + new Date().toLocaleTimeString();
+}
+
+async function delTpl() {
+  if (!name || !confirm(name + ' 템플릿을 삭제할까요?')) return;
+  await fetch('/api/templates/' + encodeURIComponent(name), { method: 'DELETE' });
+  location.href = 'template.html';
+}
+
+loadList();
+</script>
+</body>
+</html>
