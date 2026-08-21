@@ -15,7 +15,10 @@ th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; fon
 .badge.queued { background: #999; } .badge.running { background: #f0ad4e; }
 .badge.done { background: #5cb85c; } .badge.error { background: #d9534f; }
 .field-row { display: flex; gap: 16px; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
-.field-row.low { background: #fff6e5; }
+.field-row.c-red { background: #fbeaea; } .field-row.c-red .conf { color: #b3423a; }
+.field-row.c-orange { background: #fdf3e4; } .field-row.c-orange .conf { color: #b07018; }
+.field-row.c-yellow { background: #fdfae3; } .field-row.c-yellow .conf { color: #948420; }
+.field-row.c-green { background: #eaf6ec; } .field-row.c-green .conf { color: #3d8b4f; }
 .field-row img, .field-row canvas { max-width: 340px; border: 1px solid #ddd; }
 .field-row .label { width: 130px; font-weight: 600; }
 .field-row input { flex: 1; }

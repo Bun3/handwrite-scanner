@@ -40,7 +40,7 @@ async function load() {
     list.appendChild(h);
     for (const f of page.fields) {
       const row = document.createElement('div');
-      row.className = 'field-row' + (f.confidence < 0.7 ? ' low' : '');
+      row.className = 'field-row ' + confClass(f.confidence);
       const label = document.createElement('div');
       label.className = 'label';
       label.textContent = f.label + (f.confidence < 0.7 ? ' ⚠' : '');
@@ -61,17 +61,24 @@ async function load() {
         await fetch(`/api/jobs/${id}/fields`, { method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ page: page.page, id: f.id, value: inp.value }) });
-        row.classList.remove('low');
+        row.className = 'field-row c-green';   // 사람이 확인한 값 = 100%
         label.textContent = f.label;
+        conf.textContent = '100%';
       };
       row.appendChild(inp);
       const conf = document.createElement('span');
-      conf.className = 'hint';
+      conf.className = 'conf hint';
       conf.textContent = (f.confidence * 100).toFixed(0) + '%';
       row.appendChild(conf);
       list.appendChild(row);
     }
   }
+}
+
+function confClass(c) {
+  if (c >= 1) return 'c-green';
+  if (c <= 0.5) return 'c-red';
+  return c <= 0.75 ? 'c-orange' : 'c-yellow';
 }
 
 function pdf(kind) { location.href = `/api/jobs/${id}/pdf?kind=${kind}`; }
