@@ -93,9 +93,11 @@ def _recognize_with_template(job_id, st, tpl, data, page_no, total_pages,
 def _prompt(f: dict) -> str:
     label, t = f["label"], f["type"]
     if t == "circle":
-        return (f"이 이미지에는 다음 선택지들이 인쇄되어 있고, 그중 하나에 손으로 "
-                f"동그라미(또는 체크)가 표시되어 있다: {', '.join(f['candidates'])}. "
-                "표시된 항목 하나만 정확히 그대로 출력하라. 설명 금지.")
+        return (f"이 이미지에는 다음 선택지들이 인쇄되어 있다: {', '.join(f['candidates'])}. "
+                "그중 하나에 손으로 표시가 되어 있다. 표시는 동그라미, 체크(✓), 빗금, "
+                "밑줄, 덧칠 등 어떤 형태든 될 수 있다. 인쇄된 글자 위나 주변에 손글씨 "
+                "획이 겹쳐지거나 더럽혀진 항목을 찾아, 그 항목 하나만 정확히 그대로 "
+                "출력하라. 아무 표시도 없으면 '없음'을 출력하라. 설명 금지.")
     base = (f"이 이미지는 문서 양식에서 '{label}' 칸을 잘라낸 것이다. "
             "인쇄된 라벨은 무시하고 손으로 쓴 내용만 읽어라. ")
     if t == "phone":

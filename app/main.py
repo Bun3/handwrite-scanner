@@ -101,8 +101,8 @@ def job_page(job_id: str, n: int):
 
 @app.get("/api/jobs/{job_id}/pdf")
 def job_pdf(job_id: str, kind: str = "searchable"):
-    if kind not in ("searchable", "text"):
-        raise HTTPException(400, "kind는 searchable|text")
+    if kind not in ("searchable", "clean", "text"):
+        raise HTTPException(400, "kind는 searchable|clean|text")
     path = pdf_gen.generate(_safe(job_id), kind)
     return FileResponse(path, filename=f"{job_id}-{kind}.pdf")
 
