@@ -1,0 +1,43 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: handwrite-scanner
+    - link "작업" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - link "템플릿" [ref=e5] [cursor=pointer]:
+      - /url: template.html
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - heading "문서 사진 업로드" [level=3] [ref=e8]
+      - generic [ref=e9]:
+        - button "Choose File" [ref=e10]
+        - combobox [ref=e11]:
+          - option "(템플릿 없음)" [selected]
+          - option "휴가신청서"
+        - button "인식 시작" [ref=e12] [cursor=pointer]
+      - paragraph [ref=e13]: CPU에서 문서 1장당 몇 분 걸립니다. 여러 장을 걸어두고 나중에 검수하세요.
+    - generic [ref=e14]:
+      - heading "작업 목록" [level=3] [ref=e15]
+      - table [ref=e16]:
+        - rowgroup [ref=e17]:
+          - row [ref=e18]:
+            - columnheader "ID" [ref=e19]
+            - columnheader "템플릿" [ref=e20]
+            - columnheader "상태" [ref=e21]
+            - columnheader "진행" [ref=e22]
+            - columnheader [ref=e23]
+          - row [ref=e24]:
+            - cell "20260822-032319-2935a5" [ref=e25]
+            - cell "휴가신청서" [ref=e26]
+            - cell "done" [ref=e27]
+            - cell [ref=e29]
+            - cell [ref=e30]:
+              - link "검수/다운로드" [ref=e31] [cursor=pointer]:
+                - /url: review.html?id=20260822-032319-2935a5
+          - row [ref=e32]:
+            - cell "20260822-025459-c61e59" [ref=e33]
+            - cell "휴가신청서" [ref=e34]
+            - cell "done" [ref=e35]
+            - cell [ref=e37]
+            - cell [ref=e38]:
+              - link "검수/다운로드" [ref=e39] [cursor=pointer]:
+                - /url: review.html?id=20260822-025459-c61e59
