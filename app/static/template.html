@@ -22,7 +22,7 @@
 <div class="card" id="editor" style="display:none">
   <div id="canvasWrap"><canvas id="cv"></canvas></div>
   <h3>필드 목록</h3>
-  <table id="fields"><tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th></th></tr></table>
+  <table id="fields"><tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr></table>
   <br><button onclick="saveTpl()">저장</button> <span id="saved" class="hint"></span>
 </div>
 </main>
@@ -106,7 +106,7 @@ const TYPES = { text: '자유텍스트', candidates: '후보목록', phone: '전
 
 function renderFields() {
   const tb = document.getElementById('fields');
-  tb.innerHTML = '<tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th></th></tr>';
+  tb.innerHTML = '<tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr>';
   fields.forEach((f, i) => {
     const tr = tb.insertRow();
     tr.innerHTML = `<td><input value="${f.label}" onchange="fields[${i}].label=this.value;draw()"></td>
@@ -114,6 +114,8 @@ function renderFields() {
         `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
       <td><textarea rows="1" style="width:100%" placeholder="후보목록/동그라미 타입만"
         onchange="fields[${i}].candidates=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${(f.candidates || []).join('\n')}</textarea></td>
+      <td><textarea rows="1" style="width:100%" placeholder="모델에게 줄 추가 설명"
+        onchange="fields[${i}].hint=this.value.trim()">${f.hint || ''}</textarea></td>
       <td><button class="danger" onclick="fields.splice(${i},1);renderFields();draw()">삭제</button></td>`;
   });
   draw();

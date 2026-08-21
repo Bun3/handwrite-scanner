@@ -13,6 +13,8 @@ def create(template: str | None, files: list[tuple[str, bytes]]) -> str:
     (d / "output").mkdir()
     for i, (name, data) in enumerate(files):
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else "png"
+        if not ext.isalnum() or len(ext) > 5:
+            ext = "png"
         (d / "input" / f"{i:03d}.{ext}").write_bytes(data)
     write_status(job_id, {"id": job_id, "template": template, "state": "queued",
                           "progress": "", "created": time.strftime("%Y-%m-%d %H:%M:%S")})

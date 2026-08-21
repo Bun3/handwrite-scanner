@@ -3,8 +3,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENGINE_DIR = BASE_DIR / "engine"
 LLAMA_SERVER = ENGINE_DIR / "llama" / "llama-server.exe"
-MODEL = ENGINE_DIR / "models" / "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf"
-MMPROJ = ENGINE_DIR / "models" / "mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf"
+MODEL = ENGINE_DIR / "models" / "Qwen3VL-8B-Instruct-Q4_K_M.gguf"
+MMPROJ = ENGINE_DIR / "models" / "mmproj-Qwen3VL-8B-Instruct-F16.gguf"
 LLAMA_PORT = 18080
 APP_PORT = 8000
 

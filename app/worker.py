@@ -101,6 +101,8 @@ def _prompt(f: dict) -> str:
     elif f.get("candidates"):
         base += f"값은 다음 후보 중 하나다: {', '.join(f['candidates'])}. 가장 일치하는 후보를 그대로 출력하라. "
     base += "설명 없이 값만 출력하라. 비어 있으면 '없음'을 출력하라."
+    if f.get("hint"):
+        base += " " + f["hint"]
     return base
 
 

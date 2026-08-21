@@ -6,3 +6,4 @@ pymupdf
 reportlab
 pytest
 opencv-python-headless
+python-multipart
