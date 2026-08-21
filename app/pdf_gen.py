@@ -70,27 +70,49 @@ def _searchable(job_id: str, res: list, out) -> None:
     c.save()
 
 
+def _interior(dark, x, y, w, h):
+    """필드 박스에서 표 테두리선을 피한 안쪽 영역을 찾는다.
+
+    사용자가 그린 박스는 테두리선에 몇 px 걸치기 마련이라, 박스 가장자리
+    20% 구간에서 픽셀 절반 이상이 어두운 행/열(=테두리선)을 감지해 그
+    안쪽으로 물러난다.
+    """
+    sub = dark[y:y + h, x:x + w]
+    def trim(ratio, n):
+        zone = max(4, int(n * 0.2))
+        lines = [i for i in range(zone) if ratio[i] > 0.5]
+        lo = (max(lines) + 6) if lines else 6
+        lines = [i for i in range(n - zone, n) if ratio[i] > 0.5]
+        hi = (min(lines) - 6) if lines else n - 6
+        return lo, max(hi, lo + 1)
+    t, b = trim(sub.mean(axis=1), h)
+    left, r = trim(sub.mean(axis=0), w)
+    return x + left, y + t, r - left, b - t
+
+
 def _clean(job_id: str, res: list, out) -> None:
     """빈 양식 배경 + 인식 텍스트 활자 조판. 템플릿 없는 작업은 text 형식으로 폴백."""
+    import numpy as np
     st = jobs.status(job_id)
     ref = templates_store.reference_path(st["template"]) if st.get("template") else None
     if not (ref and ref.exists()):
         return _text(job_id, res, out)
+    dark = np.array(Image.open(ref).convert("L")) < 128
     c = None
     for page in res:
         c, pw, ph, scale = _page_canvas(c, ref, out)
         for f in page["fields"]:
             if not f.get("box") or not f.get("value"):
                 continue
-            x, y, bw, bh = f["box"]
-            # 칸 내부의 인쇄 골격(빈칸 안내문 등)을 흰색으로 덮고 활자로 조판
+            # 칸 안의 인쇄 골격(빈칸 안내문 등)을 테두리선은 피해서 흰색으로 덮고 조판
+            x, y, bw, bh = _interior(dark, *f["box"])
             c.setFillColorRGB(1, 1, 1)
-            c.rect((x + 3) * scale, ph - (y + bh - 3) * scale,
-                   (bw - 6) * scale, (bh - 6) * scale, stroke=0, fill=1)
+            c.rect(x * scale, ph - (y + bh) * scale,
+                   bw * scale, bh * scale, stroke=0, fill=1)
             c.setFillColorRGB(0.05, 0.05, 0.2)
-            size = _fit_font(c, f["value"], min(max(8, bh * scale * 0.45), 13),
-                             (bw - 16) * scale)
-            c.drawString((x + 8) * scale, ph - (y + bh / 2) * scale - size * 0.35,
+            size = _fit_font(c, f["value"], min(max(8, bh * scale * 0.5), 13),
+                             (bw - 8) * scale)
+            c.drawString((x + 4) * scale, ph - (y + bh / 2) * scale - size * 0.35,
                          f["value"])
         c.showPage()
     c.save()
