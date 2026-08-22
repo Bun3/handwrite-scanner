@@ -9,19 +9,24 @@
 - Windows, RAM 16GB 권장 (8GB면 3B 모델로 교체 — `app/config.py`)
 - GPU 불필요. 사무용 CPU 기준 문서 1장당 수 분 (배치로 걸어두고 나중에 검수)
 
-## 설치 (최초 1회)
+## 설치 — 배포판 (권장, Python 불필요)
+
+`build.ps1` 로 만든 `dist\handwrite-scanner.zip` 을 아무 폴더에 풀고:
+
+- **개인용**: `handwrite-scanner.exe` 실행 → 첫 실행 시 엔진(~6GB) 자동 다운로드 → 브라우저 자동 열림
+- **서버용**: 한 PC에서 `server-mode.bat` 실행 → 콘솔에 표시되는 `http://<서버IP>:8000` 주소로
+  다른 PC들이 브라우저 접속 (최초 1회 Windows 방화벽 허용 필요). 데이터는 사내망 밖으로 안 나감
+
+## 설치 — 소스 (개발용)
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 powershell -ExecutionPolicy Bypass -File setup_engine.ps1   # llama.cpp + 모델 ~6GB
-```
-
-## 실행
-
-```powershell
 .\run.ps1   # 이후 브라우저에서 http://localhost:8000
 ```
+
+배포판 빌드: `powershell -ExecutionPolicy Bypass -File build.ps1` → `dist\handwrite-scanner.zip`
 
 ## 사용법
 

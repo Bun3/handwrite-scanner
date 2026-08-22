@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import jobs, llm, pdf_gen, templates_store, worker
-from app.config import BASE_DIR, JOBS_DIR
+from app.config import JOBS_DIR, STATIC_DIR
 
 app = FastAPI(title="handwrite-scanner")
 
@@ -107,4 +107,4 @@ def job_pdf(job_id: str, kind: str = "searchable"):
     return FileResponse(path, filename=f"{job_id}-{kind}.pdf")
 
 
-app.mount("/", StaticFiles(directory=BASE_DIR / "app" / "static", html=True))
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))

@@ -1,6 +1,12 @@
+import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):  # PyInstaller 배포판: exe 옆에 engine/data
+    BASE_DIR = Path(sys.executable).resolve().parent
+    STATIC_DIR = Path(sys._MEIPASS) / "static"
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    STATIC_DIR = BASE_DIR / "app" / "static"
 ENGINE_DIR = BASE_DIR / "engine"
 LLAMA_SERVER = ENGINE_DIR / "llama" / "llama-server.exe"
 MODEL = ENGINE_DIR / "models" / "Qwen3VL-8B-Instruct-Q4_K_M.gguf"
