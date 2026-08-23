@@ -100,10 +100,12 @@ def job_page(job_id: str, n: int):
 
 
 @app.get("/api/jobs/{job_id}/pdf")
-def job_pdf(job_id: str, kind: str = "searchable"):
+def job_pdf(job_id: str, kind: str = "searchable", inline: bool = False):
     if kind not in ("searchable", "clean", "text"):
         raise HTTPException(400, "kind는 searchable|clean|text")
     path = pdf_gen.generate(_safe(job_id), kind)
+    if inline:  # 브라우저 탭에서 바로 보기 (다운로드 표식 없음)
+        return FileResponse(path, media_type="application/pdf")
     return FileResponse(path, filename=f"{job_id}-{kind}.pdf")
 
 

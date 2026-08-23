@@ -18,6 +18,7 @@
   </div>
   <div id="list"></div>
   <br>
+  <button onclick="preview('searchable')">미리보기</button>
   <button onclick="pdf('searchable')">PDF 다운로드 (원본+텍스트층)</button>
   <!-- 깔끔한 문서(kind=clean)는 수요가 적어 버튼 숨김 — API로는 ?kind=clean 지원 유지 -->
   <button class="secondary" onclick="pdf('text')">PDF 다운로드 (텍스트 재구성)</button>
@@ -83,6 +84,7 @@ function confClass(c) {
 }
 
 function pdf(kind) { location.href = `/api/jobs/${id}/pdf?kind=${kind}`; }
+function preview(kind) { window.open(`/api/jobs/${id}/pdf?kind=${kind}&inline=1`); }
 load();
 </script>
 </body>
