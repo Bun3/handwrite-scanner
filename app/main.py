@@ -1,10 +1,10 @@
 import re
 
 from fastapi import FastAPI, HTTPException, UploadFile, Form
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app import jobs, llm, pdf_gen, templates_store, worker
+from app import export, jobs, llm, pdf_gen, templates_store, worker
 from app.config import JOBS_DIR, STATIC_DIR
 
 app = FastAPI(title="handwrite-scanner")
@@ -97,6 +97,18 @@ async def job_field_update(job_id: str, body: dict):
 @app.get("/api/jobs/{job_id}/page/{n}")
 def job_page(job_id: str, n: int):
     return FileResponse(JOBS_DIR / _safe(job_id) / f"page_{n:03d}.png")
+
+
+@app.get("/api/jobs/{job_id}/export")
+def job_export(job_id: str, fmt: str = "md"):
+    if fmt not in ("md", "txt", "csv"):
+        raise HTTPException(400, "fmt는 md|txt|csv")
+    res = jobs.results(_safe(job_id))
+    if res is None:
+        raise HTTPException(404, "결과 없음")
+    content, fname, mt = export.build(job_id, res, fmt)
+    return Response(content, media_type=mt, headers={
+        "Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @app.get("/api/jobs/{job_id}/pdf")

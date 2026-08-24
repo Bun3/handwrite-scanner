@@ -21,7 +21,12 @@
   <button onclick="preview('searchable')">미리보기</button>
   <button onclick="pdf('searchable')">PDF 다운로드 (원본+텍스트층)</button>
   <!-- 깔끔한 문서(kind=clean)는 수요가 적어 버튼 숨김 — API로는 ?kind=clean 지원 유지 -->
-  <button class="secondary" onclick="pdf('text')">PDF 다운로드 (텍스트 재구성)</button>
+  <select id="expFmt">
+    <option value="md">Markdown (.md)</option>
+    <option value="txt">텍스트 (.txt)</option>
+    <option value="csv">CSV (.csv)</option>
+  </select>
+  <button class="secondary" onclick="exportFile()">표 내보내기</button>
 </div>
 </main>
 <script>
@@ -85,6 +90,9 @@ function confClass(c) {
 
 function pdf(kind) { location.href = `/api/jobs/${id}/pdf?kind=${kind}`; }
 function preview(kind) { window.open(`/api/jobs/${id}/pdf?kind=${kind}&inline=1`); }
+function exportFile() {
+  location.href = `/api/jobs/${id}/export?fmt=${document.getElementById('expFmt').value}`;
+}
 load();
 </script>
 </body>
