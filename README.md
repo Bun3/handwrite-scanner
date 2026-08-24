@@ -22,7 +22,7 @@
 ```powershell
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-powershell -ExecutionPolicy Bypass -File setup_engine.ps1   # llama.cpp + 모델 ~6GB
+.venv\Scripts\python -c "from app.engine_setup import ensure_engine; ensure_engine()"  # llama.cpp + 모델 ~6GB
 .\run.ps1   # 이후 브라우저에서 http://localhost:8000
 ```
 
