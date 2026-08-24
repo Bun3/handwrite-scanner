@@ -10,5 +10,6 @@ $ErrorActionPreference = "Stop"
 # 서버 모드 실행용 바로가기 배치
 Set-Content -Encoding utf8 "$PSScriptRoot\dist\handwrite-scanner\server-mode.bat" `
     "@echo off`r`n`"%~dp0handwrite-scanner.exe`" --server`r`npause"
+Copy-Item "$PSScriptRoot\사용법.md" "$PSScriptRoot\dist\handwrite-scanner\"
 Compress-Archive -Force "$PSScriptRoot\dist\handwrite-scanner" "$PSScriptRoot\dist\handwrite-scanner.zip"
 Write-Host "빌드 완료: dist\handwrite-scanner.zip"
