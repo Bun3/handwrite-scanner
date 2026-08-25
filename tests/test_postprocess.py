@@ -52,14 +52,19 @@ def test_export_formats():
            {"fields": [{"label": "성명", "value": "김영수"},
                        {"label": "사유", "value": "병가"}]}]
     md = build("j1", res, "md")[0]
-    assert "| 성명 | 홍길동 |" in md and "## 2 페이지" in md
+    assert "| 페이지 | 성명 | 사유 |" in md and "| 1 | 홍길동 | 개인 사유 |" in md
     txt = build("j1", res, "txt")[0]
-    assert "성명 | 홍길동" in txt
+    assert txt.splitlines()[0].split(" | ")[1].strip() == "성명"
     csv_out = build("j1", res, "csv")[0]
-    assert "페이지,성명,사유" in csv_out          # 구성 동일 → 페이지당 한 행
+    assert "페이지,성명,사유" in csv_out          # 페이지당 한 행, 라벨이 컬럼
     assert "2,김영수,병가" in csv_out
+    # 구성이 달라도(건너뜀·자유 추출) 세로로 안 떨어지고 합집합 컬럼 + 공란
     res[1]["fields"].append({"label": "비고", "value": "x"})
-    assert "페이지,필드,값" in build("j1", res, "csv")[0]  # 구성 다름 → 세로 형식
+    res.append({"fields": []})                    # 건너뛴 페이지
+    csv_out = build("j1", res, "csv")[0]
+    assert "페이지,성명,사유,비고" in csv_out
+    assert "1,홍길동,개인 사유," in csv_out
+    assert "3,,," in csv_out
 
 
 def test_export_merged():

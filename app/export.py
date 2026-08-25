@@ -23,35 +23,34 @@ def merged(template: str, job_list: list[tuple[dict, list]], fmt: str
 
 
 def build(job_id: str, res: list, fmt: str) -> tuple[str, str, str]:
-    """반환: (내용, 파일명, media_type)"""
-    pages = [[(f["label"], f.get("value", "")) for f in p["fields"]] for p in res]
+    """반환: (내용, 파일명, media_type).
+
+    시트 형태 고정: 페이지당 한 행, 필드 라벨이 컬럼. 컬럼은 전 페이지 라벨의
+    합집합(첫 등장 순)이라 필드 구성이 다른 페이지(건너뜀·자유 추출)는 공란으로 채운다.
+    """
+    labels: list[str] = []
+    for p in res:
+        for f in p["fields"]:
+            if f["label"] not in labels:
+                labels.append(f["label"])
+    header = ["페이지"] + labels
+    rows = [[str(i + 1)] + [dict((f["label"], f.get("value", "")) for f in p["fields"])
+                            .get(l, "") for l in labels]
+            for i, p in enumerate(res)]
     if fmt == "md":
-        out = []
-        for i, rows in enumerate(pages):
-            out += [f"## {i + 1} 페이지", "", "| 필드 | 값 |", "|---|---|"]
-            out += [f"| {l} | {v} |" for l, v in rows]
-            out.append("")
+        out = ["| " + " | ".join(header) + " |",
+               "|" + "---|" * len(header)]
+        out += ["| " + " | ".join(r) + " |" for r in rows]
         return "\n".join(out), f"{job_id}.md", "text/markdown; charset=utf-8"
     if fmt == "txt":
-        out = []
-        for i, rows in enumerate(pages):
-            w = max((len(l) for l, _ in rows), default=0)
-            out.append(f"[{i + 1} 페이지]")
-            out += [f"{l.ljust(w)} | {v}" for l, v in rows]
-            out.append("")
-        return "\n".join(out), f"{job_id}.txt", "text/plain; charset=utf-8"
-    # csv: 모든 페이지의 필드 구성이 같으면 페이지당 한 행(엑셀 집계용), 아니면 세로 형식
+        widths = [max(len(header[c]), *(len(r[c]) for r in rows), 0) if rows
+                  else len(header[c]) for c in range(len(header))]
+        line = lambda r: " | ".join(v.ljust(widths[c]) for c, v in enumerate(r))
+        return "\n".join([line(header)] + [line(r) for r in rows]), \
+            f"{job_id}.txt", "text/plain; charset=utf-8"
     buf = io.StringIO()
     w = csv.writer(buf)
-    label_sets = [[l for l, _ in rows] for rows in pages]
-    if label_sets and all(ls == label_sets[0] for ls in label_sets):
-        w.writerow(["페이지"] + label_sets[0])
-        for i, rows in enumerate(pages):
-            w.writerow([i + 1] + [v for _, v in rows])
-    else:
-        w.writerow(["페이지", "필드", "값"])
-        for i, rows in enumerate(pages):
-            for l, v in rows:
-                w.writerow([i + 1, l, v])
+    w.writerow(header)
+    w.writerows(rows)
     # BOM: 엑셀이 한글 CSV를 UTF-8로 인식하게
     return "﻿" + buf.getvalue(), f"{job_id}.csv", "text/csv; charset=utf-8"
