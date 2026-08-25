@@ -92,7 +92,7 @@ footer.doc { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--li
   모든 처리가 회사 PC 안에서 이루어지며 문서가 외부로 전송되지 않습니다.</p>
   <nav class="toc">
     <a href="#install">설치·실행</a><a href="#template">템플릿 만들기</a><a href="#scan">문서 인식</a>
-    <a href="#review">검수</a><a href="#output">결과 받기</a><a href="#trouble">문제 해결</a>
+    <a href="#review">검수</a><a href="#output">결과 받기</a><a href="#cli">자동화(CLI)</a><a href="#trouble">문제 해결</a>
   </nav>
 </header>
 
@@ -260,7 +260,33 @@ GPU는 필요 없습니다. 프로그램을 끝내려면 검은 콘솔 창을 �
       찾아 해당 검수 화면으로 바로 이동합니다.</li>
 </ul>
 
-<h2 id="trouble"><span class="step">6</span>문제 해결</h2>
+<h2 id="cli"><span class="step">6</span>자동화 — CLI (스크립트·AI 에이전트)</h2>
+<p>프로그램이 켜져 있는 상태에서, 화면 대신 명령줄로 모든 기능을 쓸 수 있습니다.
+출력이 전부 JSON이라 스크립트나 <b>AI 에이전트</b>(Claude Code 등)가 바로 파싱합니다.
+예를 들어 에이전트에게 "이 폴더 문서 다 인식되면 알려줘"라고 시키면, 에이전트가 아래
+명령으로 제출하고 완료 시점에 보고하게 할 수 있습니다.</p>
+
+<div class="tablewrap"><table>
+  <tr><th>명령</th><th>하는 일</th></tr>
+  <tr><td><code>handwrite-scanner.exe cli jobs submit 문서.pdf --template 휴가신청서 --wait</code></td>
+      <td>업로드 후 <b>완료까지 기다렸다가</b> 결과 JSON 출력. <code>--wait</code>를 빼면 작업 id만 반환</td></tr>
+  <tr><td><code>handwrite-scanner.exe cli jobs wait --all</code></td>
+      <td>대기·진행 중인 <b>모든 작업</b>이 끝날 때까지 기다림 — "다 되면 알려줘" 용</td></tr>
+  <tr><td><code>handwrite-scanner.exe cli jobs export &lt;id&gt; --fmt csv -o 결과.csv</code></td>
+      <td>표 내보내기 (md·txt·csv). <code>jobs pdf</code>·<code>jobs original</code>도 같은 방식</td></tr>
+  <tr><td><code>handwrite-scanner.exe cli export-merged --template 휴가신청서 --fmt csv</code></td>
+      <td>그 양식으로 처리한 모든 문서를 한 표로 취합</td></tr>
+  <tr><td><code>handwrite-scanner.exe cli search 홍길동</code></td>
+      <td>과거 인식 결과 전체에서 검색</td></tr>
+  <tr><td><code>handwrite-scanner.exe cli --help</code></td>
+      <td>전체 명령 보기 — 템플릿 관리(<code>templates</code>)·모델 관리(<code>models</code>)·검수
+      수정(<code>jobs set</code>)까지 화면의 모든 기능이 있습니다</td></tr>
+</table></div>
+
+<p>다른 PC의 서버에 붙일 땐 <code>--server http://서버주소:8000</code>을 붙이면 됩니다.
+오래 걸리는 배치는 <code>--timeout 43200</code>(12시간)처럼 대기 한도를 늘려 주세요.</p>
+
+<h2 id="trouble"><span class="step">7</span>문제 해결</h2>
 <div class="tablewrap"><table>
   <tr><th>증상</th><th>원인과 해결</th></tr>
   <tr><td>내려받은 PDF를 열 때 "위험할 수 있음" 경고</td>
