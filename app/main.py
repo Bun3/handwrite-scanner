@@ -263,6 +263,26 @@ def job_delete(job_id: str):
     return {"ok": True}
 
 
+@app.get("/api/jobs/{job_id}/original")
+def job_original(job_id: str):
+    """업로드했던 원본 파일 다운로드. 여러 장이면 zip으로 묶음."""
+    safe_id = _safe(job_id)
+    files = jobs.input_images(safe_id) if jobs.status(safe_id) else []
+    if not files:
+        raise HTTPException(404, "원본 없음")
+    if len(files) == 1:
+        return FileResponse(files[0], media_type="application/octet-stream",
+                            filename=f"{safe_id}-original{files[0].suffix}")
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for f in files:
+            z.write(f, f.name)
+    return Response(buf.getvalue(), media_type="application/zip", headers={
+        "Content-Disposition": f'attachment; filename="{safe_id}-original.zip"'})
+
+
 @app.get("/api/jobs/{job_id}/page/{n}")
 def job_page(job_id: str, n: int):
     return FileResponse(JOBS_DIR / _safe(job_id) / f"page_{n:03d}.png")

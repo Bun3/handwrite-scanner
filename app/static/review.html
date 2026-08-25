@@ -21,6 +21,7 @@
   <button onclick="preview('searchable')">미리보기</button>
   <button onclick="pdf('searchable')">PDF 다운로드 (원본+텍스트층)</button>
   <!-- 깔끔한 문서(kind=clean)는 수요가 적어 버튼 숨김 — API로는 ?kind=clean 지원 유지 -->
+  <button class="secondary" onclick="location.href=`/api/jobs/${id}/original`">원본 다운로드</button>
   <select id="expFmt">
     <option value="md">Markdown (.md)</option>
     <option value="txt">텍스트 (.txt)</option>
