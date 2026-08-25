@@ -10,12 +10,27 @@ from app import jobs, llm, postprocess, templates_store
 from app.align import best_template, to_reference
 
 _q: "queue.Queue[str]" = queue.Queue()
+_cancel: set[str] = set()
 
 PAD = 8  # 필드 crop 여백(px)
 
 
+class _Cancelled(Exception):
+    pass
+
+
 def enqueue(job_id: str) -> None:
     _q.put(job_id)
+
+
+def cancel(job_id: str) -> None:
+    """협조적 중단 요청 — 진행 중인 필드 하나는 끝내고 멈춘다."""
+    _cancel.add(job_id)
+
+
+def _check_cancel(job_id: str) -> None:
+    if job_id in _cancel:
+        raise _Cancelled()
 
 
 def start() -> None:
@@ -31,7 +46,8 @@ def _loop() -> None:
     while True:
         job_id = _q.get()
         st = jobs.status(job_id)
-        if st is None:  # 큐 대기 중 삭제된 작업
+        if st is None or st["state"] == "cancelled":  # 대기 중 삭제·중단된 작업
+            _cancel.discard(job_id)
             continue
         try:
             st["state"] = "running"
@@ -39,9 +55,13 @@ def _loop() -> None:
             _process(job_id, st)
             st["state"] = "done"
             st["progress"] = ""
+        except _Cancelled:
+            st["state"] = "cancelled"
+            st["progress"] = ""
         except Exception:
             st["state"] = "error"
             st["error"] = traceback.format_exc(limit=3)
+        _cancel.discard(job_id)
         jobs.write_status(job_id, st)
 
 
@@ -55,6 +75,7 @@ def _process(job_id: str, st: dict) -> None:
     results = []
     job_dir = jobs.JOBS_DIR / job_id
     for page_no, img_path in enumerate(images):
+        _check_cancel(job_id)
         data = img_path.read_bytes()
         tpl, aligned, ok = tpl_fixed, None, None
         if tpl_fixed:
@@ -88,6 +109,7 @@ def _recognize_fields(job_id, st, tpl, aligned, page_no, total_pages, job_dir):
     aligned.save(job_dir / f"page_{page_no:03d}.png")
     out = []
     for i, f in enumerate(tpl["fields"]):
+        _check_cancel(job_id)
         st["progress"] = f"{page_no + 1}/{total_pages}페이지 · {i + 1}/{len(tpl['fields'])} {f['label']}"
         jobs.write_status(job_id, st)
         x, y, w, h = f["box"]

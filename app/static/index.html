@@ -116,6 +116,8 @@ async function refresh() {
       <td><span class="badge ${esc(s.state)}">${esc(s.state)}</span></td>
       <td>${esc(s.progress || (s.error ? '오류' : ''))}</td>
       <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}
+      ${['running', 'queued'].includes(s.state) ? `<button class="secondary" style="padding:3px 10px;font-size:12px"
+        onclick="cancelJob('${esc(s.id)}')">중단</button>` : ''}
       ${s.state !== 'running' ? `<button class="danger" style="padding:3px 10px;font-size:12px"
         onclick="delJob('${esc(s.id)}')">삭제</button>` : ''}</td>`;
   }
@@ -167,6 +169,13 @@ async function mdlSelect(id) {
   const r = await fetch(`/api/models/${id}/select`, { method: 'POST' });
   if (!r.ok) alert((await r.json()).detail || '변경 실패');
   loadModels();
+}
+
+async function cancelJob(id) {
+  if (!confirm('이 작업을 중단할까요? (진행 중인 필드 하나는 마저 처리 후 멈춥니다)')) return;
+  const r = await fetch(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+  if (!r.ok) alert((await r.json()).detail || '중단 실패');
+  refresh();
 }
 
 async function delJob(id) {

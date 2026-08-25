@@ -234,6 +234,23 @@ async def template_add_candidate(name: str, body: dict):
                                                    body["field_id"], body["value"])}
 
 
+@app.post("/api/jobs/{job_id}/cancel")
+def job_cancel(job_id: str):
+    safe_id = _safe(job_id)
+    st = jobs.status(safe_id)
+    if not st:
+        raise HTTPException(404, "작업 없음")
+    if st["state"] == "queued":
+        st["state"] = "cancelled"
+        jobs.write_status(safe_id, st)
+        worker.cancel(safe_id)
+        return {"ok": True}
+    if st["state"] == "running":
+        worker.cancel(safe_id)  # 진행 중인 필드 하나는 끝내고 멈춤
+        return {"ok": True}
+    raise HTTPException(409, "이미 종료된 작업입니다")
+
+
 @app.delete("/api/jobs/{job_id}")
 def job_delete(job_id: str):
     safe_id = _safe(job_id)
