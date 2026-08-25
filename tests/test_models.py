@@ -27,6 +27,13 @@ def test_current_defaults_to_recommended(tmp_path, monkeypatch):
     assert models.current()["id"] == "qwen3vl-8b"  # 미설치 → 첫 실행 다운로드 대상
 
 
+def test_first_run_download_capped_at_8b(tmp_path, monkeypatch):
+    monkeypatch.setattr(models, "SETTINGS", tmp_path / "settings.json")
+    monkeypatch.setattr(models, "total_ram_gb", lambda: 64)  # 추천은 30b지만
+    monkeypatch.setattr(models, "installed", lambda e: False)
+    assert models.current()["id"] == "qwen3vl-8b"  # 자동 설치는 8b까지
+
+
 def test_current_falls_back_to_installed(tmp_path, monkeypatch):
     monkeypatch.setattr(models, "SETTINGS", tmp_path / "settings.json")
     monkeypatch.setattr(models, "total_ram_gb", lambda: 64)   # 추천은 30b지만

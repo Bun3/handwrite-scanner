@@ -90,7 +90,9 @@ def current() -> dict:
     have = [e for e in CATALOG if installed(e)]
     if have:
         return have[-1]  # 설치된 것 중 가장 큰 모델
-    return rec  # 아무것도 없음 → 첫 실행 다운로드 대상 = 추천 모델
+    # 아무것도 없음 → 첫 실행 자동 다운로드 대상. 30B(20GB)는 초기 세팅이
+    # 너무 길어 8B까지만 자동 설치 — 30B는 UI에서 수동 다운로드.
+    return entry("qwen3vl-8b") if rec["id"] == "qwen3vl-30b" else rec
 
 
 def select(model_id: str) -> dict:
