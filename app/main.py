@@ -205,12 +205,13 @@ async def template_add_candidate(name: str, body: dict):
 
 @app.delete("/api/jobs/{job_id}")
 def job_delete(job_id: str):
-    st = jobs.status(_safe(job_id))
+    safe_id = _safe(job_id)
+    st = jobs.status(safe_id)
     if not st:
         raise HTTPException(404, "작업 없음")
     if st["state"] == "running":
         raise HTTPException(409, "처리 중인 작업은 삭제할 수 없습니다. 완료 후 삭제하세요.")
-    jobs.delete(job_id)
+    jobs.delete(safe_id)
     return {"ok": True}
 
 

@@ -66,4 +66,7 @@ def input_images(job_id: str) -> list:
 
 def delete(job_id: str) -> None:
     import shutil
-    shutil.rmtree(JOBS_DIR / job_id, ignore_errors=True)
+    target = (JOBS_DIR / job_id).resolve()
+    if target.parent != JOBS_DIR.resolve():  # 경로 이탈 방어 (2차 방어선)
+        raise ValueError(f"잘못된 작업 경로: {job_id}")
+    shutil.rmtree(target, ignore_errors=True)

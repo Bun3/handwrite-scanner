@@ -1,4 +1,14 @@
+import pytest
+
 from app import jobs
+
+
+def test_delete_containment(tmp_path, monkeypatch):
+    monkeypatch.setattr(jobs, "JOBS_DIR", tmp_path)
+    with pytest.raises(ValueError):
+        jobs.delete("../evil")
+    with pytest.raises(ValueError):
+        jobs.delete("a/b")
 
 
 def test_pdf_split(tmp_path, monkeypatch):
