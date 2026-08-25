@@ -88,10 +88,17 @@ document.getElementById('sf').onsubmit = async e => {
   }
 };
 
-function mergedExport() {
+async function mergedExport() {
   const t = document.getElementById('mTpl').value;
   if (!t) return alert('템플릿이 없습니다');
-  location.href = `/api/export-merged?template=${encodeURIComponent(t)}&fmt=${document.getElementById('mFmt').value}`;
+  const url = `/api/export-merged?template=${encodeURIComponent(t)}&fmt=${document.getElementById('mFmt').value}`;
+  const r = await fetch(url).catch(() => null);
+  if (!r || !r.ok) {
+    let msg = null;
+    try { msg = (await r.json()).detail; } catch {}
+    return alert(msg || '내보낼 완료된 작업이 없습니다');
+  }
+  location.href = url;
 }
 
 async function refresh() {

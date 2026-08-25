@@ -249,9 +249,12 @@ def export_merged(template: str, fmt: str = "csv"):
         raise HTTPException(404, "해당 템플릿으로 완료된 작업 없음")
     content, fname, mt = export.merged(template, job_list, fmt)
     from urllib.parse import quote
+    # ASCII filename 폴백 필수 — filename*만 주면 일부 브라우저/다운로드 매니저가
+    # 파일명을 못 정해 다운로드가 깨진다
     return Response(content, media_type=mt, headers={
         "Content-Disposition":
-            f"attachment; filename*=UTF-8''{quote(fname)}"})
+            f'attachment; filename="merged.{fmt}"; '
+            f"filename*=UTF-8''{quote(fname)}"})
 
 
 @app.get("/api/jobs/{job_id}/export")
