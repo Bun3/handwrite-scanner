@@ -7,7 +7,7 @@ import threading
 import traceback
 
 from app import jobs, llm, postprocess, templates_store
-from app.align import best_template, to_reference
+from app.align import HAVE_CV2, best_template, to_reference
 
 _q: "queue.Queue[str]" = queue.Queue()
 _cancel: set[str] = set()
@@ -81,6 +81,15 @@ def _process(job_id: str, st: dict) -> None:
         if tpl_fixed:
             aligned, ok = to_reference(
                 data, templates_store.reference_path(tpl_fixed["name"]))
+            if HAVE_CV2 and not ok:
+                # 지정 양식과 정합 실패 = 사이에 끼인 증빙 등 다른 서류 → 인식 생략
+                import shutil
+                shutil.copy(img_path, job_dir / f"page_{page_no:03d}.png")
+                results.append({"page": page_no, "aligned": None,
+                                "template": None, "skipped": True, "fields": [],
+                                "warnings": ["지정한 양식과 일치하지 않아 인식하지 않고 건너뛰었습니다"]})
+                jobs.write_results(job_id, results)
+                continue
         elif detect_pool:
             tpl, aligned = best_template(data, detect_pool)
             ok = tpl is not None

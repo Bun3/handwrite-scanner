@@ -45,7 +45,8 @@ async function load() {
     await new Promise(r => pageImg.onload = r);
     const h = document.createElement('h4');
     h.textContent = `${page.page + 1} 페이지 — ` +
-      (page.template ? `양식: ${page.template}` : '양식 자동 인식 안 됨 (템플릿 없이 추출)');
+      (page.skipped ? '건너뜀 (지정 양식과 다른 서류)' :
+       page.template ? `양식: ${page.template}` : '양식 자동 인식 안 됨 (템플릿 없이 추출)');
     list.appendChild(h);
     for (const w of page.warnings || []) {
       const div = document.createElement('div');

@@ -11,6 +11,7 @@ except ImportError:  # opencv 휠이 없는 환경: 리사이즈 폴백만 사�
 
 
 DETECT_MIN_SCORE = 40  # 자동 판별 채택 최소 인라이어 수
+HAVE_CV2 = cv2 is not None
 
 
 def to_reference(photo_bytes: bytes, ref_png_path) -> tuple[Image.Image, bool]:

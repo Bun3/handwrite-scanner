@@ -39,9 +39,9 @@ def _ensure_template():
               json={"fields": fields}, timeout=30).raise_for_status()
 
 
-def _run_job(template: str) -> dict:
+def _run_job(template: str, files=None) -> dict:
     r = httpx.post(BASE + "/api/jobs", data={"template": template},
-                   files=[("files", ("dummy-filled.png",
+                   files=files or [("files", ("dummy-filled.png",
                            open(f"{FIX}/dummy-filled.png", "rb"), "image/png"))])
     job_id = r.json()["id"]
     deadline = time.time() + 1800
@@ -66,6 +66,19 @@ def _assert_truth(d: dict):
 def test_dummy_vacation_form():
     _ensure_template()
     _assert_truth(_run_job(TEMPLATE))
+
+
+@pytest.mark.skipif(not _server_up(), reason="서버 미기동")
+def test_skip_unrelated_page():
+    """지정 양식과 다른 서류(증빙 등)는 LLM 호출 없이 건너뜀. 추론 없어 수 초면 끝."""
+    import io
+    from PIL import Image
+    _ensure_template()
+    buf = io.BytesIO()
+    Image.new("RGB", (800, 1100), "white").save(buf, "PNG")  # 특징점 없는 백지 = 정합 불가
+    d = _run_job(TEMPLATE, files=[("files", ("blank.png", buf.getvalue(), "image/png"))])
+    page = d["results"][0]
+    assert page.get("skipped") is True and page["fields"] == []
 
 
 @pytest.mark.skipif(not _server_up(), reason="서버 미기동")
