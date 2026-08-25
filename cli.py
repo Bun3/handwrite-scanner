@@ -90,7 +90,18 @@ def cmd_jobs_submit(c, a):
 
 def cmd_jobs_list(c, a): _out(_req(c, "GET", "/api/jobs").json())
 def cmd_jobs_get(c, a): _out(_req(c, "GET", f"/api/jobs/{a.id}").json())
-def cmd_jobs_wait(c, a): _out(_wait(c, a.id, a.timeout))
+def cmd_jobs_wait(c, a):
+    if a.all:
+        deadline = time.time() + a.timeout
+        while time.time() < deadline:
+            all_jobs = _req(c, "GET", "/api/jobs").json()
+            if not any(s["state"] in ("queued", "running") for s in all_jobs):
+                return _out(all_jobs)
+            time.sleep(5)
+        _die(f"시간 초과({a.timeout}초). 아직 진행 중인 작업이 있습니다.")
+    if not a.id:
+        _die("작업 id 또는 --all 이 필요합니다")
+    _out(_wait(c, a.id, a.timeout))
 def cmd_jobs_cancel(c, a): _out(_req(c, "POST", f"/api/jobs/{a.id}/cancel").json())
 def cmd_jobs_delete(c, a): _out(_req(c, "DELETE", f"/api/jobs/{a.id}").json())
 
@@ -193,8 +204,9 @@ def _build_parser() -> argparse.ArgumentParser:
         s = jobs.add_parser(name, help=help_)
         s.add_argument("id")
         s.set_defaults(fn=fn)
-    s = jobs.add_parser("wait", help="완료까지 대기 후 결과 출력")
-    s.add_argument("id")
+    s = jobs.add_parser("wait", help="완료까지 대기 후 결과 출력 (--all: 전체 작업 완료 대기)")
+    s.add_argument("id", nargs="?")
+    s.add_argument("--all", action="store_true", help="모든 대기·진행 중 작업이 끝날 때까지 대기")
     s.add_argument("--timeout", type=int, default=3600)
     s.set_defaults(fn=cmd_jobs_wait)
     s = jobs.add_parser("set", help="검수: 필드 값 수정")
