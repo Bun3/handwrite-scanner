@@ -1,8 +1,11 @@
-"""첫 실행 시 인식 엔진(llama.cpp + 모델) 자동 다운로드. 콘솔에 진행률 표시."""
-import shutil
-import zipfile
+"""첫 실행 시 인식 엔진(llama.cpp + 모델) 자동 다운로드.
 
-import httpx
+curl(Windows 10+ 기본 탑재)로 받아서 진행률 표시·재시도·이어받기를 지원한다.
+중간에 끊겨도 다시 실행하면 받던 지점부터 이어받는다.
+"""
+import shutil
+import subprocess
+import zipfile
 
 from app import config
 
@@ -12,18 +15,32 @@ HF = "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/"
 
 def _download(url: str, dest, label: str) -> None:
     tmp = dest.with_name(dest.name + ".part")
-    with httpx.stream("GET", url, follow_redirects=True, timeout=60) as r:
-        r.raise_for_status()
-        total = int(r.headers.get("content-length", 0))
-        done = last = 0
-        with open(tmp, "wb") as f:
-            for chunk in r.iter_bytes(1 << 20):
-                f.write(chunk)
-                done += len(chunk)
-                pct = done * 100 // total if total else 0
-                if pct >= last + 5:
-                    last = pct
-                    print(f"  {label}: {pct}% ({done // (1 << 20)}MB)", flush=True)
+    curl = shutil.which("curl")
+    if curl:
+        # -C - : 이어받기 / --retry : 일시적 네트워크 오류 자동 재시도
+        r = subprocess.run([curl, "-L", "-C", "-", "--retry", "10",
+                            "--retry-delay", "3", "--connect-timeout", "30",
+                            "-o", str(tmp), url])
+        if r.returncode != 0:
+            raise RuntimeError(
+                f"{label} 다운로드 실패 (curl 종료코드 {r.returncode}). "
+                "네트워크를 확인하고 프로그램을 다시 실행하면 받던 지점부터 이어받습니다.")
+    else:  # curl이 없는 환경 폴백
+        import httpx
+        done = tmp.stat().st_size if tmp.exists() else 0
+        headers = {"Range": f"bytes={done}-"} if done else {}
+        with httpx.stream("GET", url, headers=headers, follow_redirects=True,
+                          timeout=60) as resp:
+            resp.raise_for_status()
+            mode = "ab" if resp.status_code == 206 else "wb"
+            last = done
+            with open(tmp, mode) as f:
+                for chunk in resp.iter_bytes(1 << 20):
+                    f.write(chunk)
+                    done += len(chunk)
+                    if done - last >= 100 * (1 << 20):  # 100MB마다 표시
+                        last = done
+                        print(f"  {label}: {done // (1 << 20)}MB 수신", flush=True)
     tmp.replace(dest)
 
 
@@ -39,7 +56,8 @@ def ensure_engine() -> None:
         zip_path.unlink()
     for path in (config.MODEL, config.MMPROJ):
         if not path.exists():
-            print(f"모델 다운로드 중: {path.name} (수 GB, 오래 걸립니다)", flush=True)
+            print(f"모델 다운로드 중: {path.name} (수 GB — 아래 진행률 참고. "
+                  "중간에 꺼져도 재실행하면 이어받습니다)", flush=True)
             path.parent.mkdir(parents=True, exist_ok=True)
             _download(HF + path.name, path, path.name)
     print("엔진 준비 완료.", flush=True)
