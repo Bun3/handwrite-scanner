@@ -63,6 +63,9 @@
 </main>
 <script>
 async function j(u, o) { const r = await fetch(u, o); return r.json(); }
+// 인식된 문서 내용 등 신뢰할 수 없는 값을 innerHTML에 넣기 전 이스케이프
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function loadTpl() {
   const tpls = await j('/api/templates');
@@ -79,9 +82,9 @@ document.getElementById('sf').onsubmit = async e => {
   tb.innerHTML = '<tr><th>값</th><th>필드</th><th>양식</th><th>처리일시</th><th></th></tr>';
   if (!hits.length) { tb.insertRow().innerHTML = '<td colspan="5" class="hint">결과 없음</td>'; return; }
   for (const h of hits) {
-    tb.insertRow().innerHTML = `<td><b>${h.value}</b></td><td>${h.label}</td>
-      <td>${h.template || '-'}</td><td>${h.created}</td>
-      <td><a href="review.html?id=${h.job}">열기 (${h.page + 1}p)</a></td>`;
+    tb.insertRow().innerHTML = `<td><b>${esc(h.value)}</b></td><td>${esc(h.label)}</td>
+      <td>${esc(h.template || '-')}</td><td>${esc(h.created)}</td>
+      <td><a href="review.html?id=${encodeURIComponent(h.job)}">열기 (${h.page + 1}p)</a></td>`;
   }
 };
 
@@ -97,10 +100,10 @@ async function refresh() {
   tb.innerHTML = '<tr><th>ID</th><th>템플릿</th><th>상태</th><th>진행</th><th></th></tr>';
   for (const s of jobs) {
     const tr = tb.insertRow();
-    tr.innerHTML = `<td>${s.id}</td><td>${s.template || '-'}</td>
-      <td><span class="badge ${s.state}">${s.state}</span></td>
-      <td>${s.progress || (s.error ? '오류' : '')}</td>
-      <td>${s.state === 'done' ? `<a href="review.html?id=${s.id}">검수/다운로드</a>` : ''}</td>`;
+    tr.innerHTML = `<td>${esc(s.id)}</td><td>${esc(s.template || '-')}</td>
+      <td><span class="badge ${esc(s.state)}">${esc(s.state)}</span></td>
+      <td>${esc(s.progress || (s.error ? '오류' : ''))}</td>
+      <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}</td>`;
   }
 }
 
