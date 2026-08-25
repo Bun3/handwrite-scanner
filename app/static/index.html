@@ -12,6 +12,11 @@
   <span id="llm" class="hint"></span>
 </header>
 <main>
+<div class="warn" id="updBanner" style="display:none">
+  🔔 새 버전 <b id="updVer"></b>이 나왔습니다.
+  <a id="updLink" target="_blank" rel="noopener">다운로드 페이지 열기</a> —
+  받은 zip을 기존 폴더에 덮어쓰면 모델·작업 기록은 그대로 유지됩니다.
+</div>
 <div class="card">
   <h3>문서 사진 업로드</h3>
   <div class="warn" id="tplHint" style="display:none">
@@ -63,7 +68,17 @@ async function health() {
   document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 로딩 중(첫 작업 시 자동 기동)';
 }
 
+async function updateCheck() {
+  const u = await j('/api/update');
+  if (u.available) {
+    document.getElementById('updVer').textContent = 'v' + u.latest;
+    document.getElementById('updLink').href = u.url;
+    document.getElementById('updBanner').style.display = '';
+  }
+}
+
 loadTpl(); refresh(); health(); setInterval(refresh, 3000);
+setTimeout(updateCheck, 3000);
 </script>
 </body>
 </html>

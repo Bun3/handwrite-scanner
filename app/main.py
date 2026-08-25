@@ -5,9 +5,28 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app import export, jobs, llm, pdf_gen, templates_store, worker
-from app.config import JOBS_DIR, STATIC_DIR
+from app.config import GITHUB_REPO, JOBS_DIR, STATIC_DIR, VERSION
 
 app = FastAPI(title="handwrite-scanner")
+
+_update = {"current": VERSION, "available": False}
+
+
+def _ver(tag: str) -> tuple:
+    return tuple(int(x) for x in tag.lstrip("v").split("."))
+
+
+def _check_update():
+    """GitHub 최신 릴리스 확인. 오프라인이면 조용히 넘어감."""
+    import httpx
+    try:
+        r = httpx.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+                      timeout=5, follow_redirects=True)
+        tag = r.json()["tag_name"]
+        _update.update(latest=tag.lstrip("v"), url=r.json()["html_url"],
+                       available=_ver(tag) > _ver(VERSION))
+    except Exception:
+        pass
 
 
 def _safe(name: str) -> str:
@@ -19,12 +38,19 @@ def _safe(name: str) -> str:
 
 @app.on_event("startup")
 def _startup():
+    import threading
     worker.start()
+    threading.Thread(target=_check_update, daemon=True).start()
 
 
 @app.get("/api/health")
 def health():
-    return {"app": "ok", "llm": llm.is_up()}
+    return {"app": "ok", "llm": llm.is_up(), "version": VERSION}
+
+
+@app.get("/api/update")
+def update_info():
+    return _update
 
 
 # ---------- 템플릿 ----------

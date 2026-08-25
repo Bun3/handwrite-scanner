@@ -38,6 +38,13 @@ def test_validate_text_passthrough():
     assert validate("개인  사유", "text")[0] == "개인 사유"
 
 
+def test_version_compare():
+    from app.main import _ver
+    assert _ver("v0.2.0") > _ver("0.1.0")
+    assert _ver("0.10.0") > _ver("0.9.9")
+    assert not _ver("v0.1.0") > _ver("0.1.0")
+
+
 def test_export_formats():
     from app.export import build
     res = [{"fields": [{"label": "성명", "value": "홍길동"},
