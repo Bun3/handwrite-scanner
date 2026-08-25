@@ -74,8 +74,11 @@ def _process(job_id: str, st: dict) -> None:
             st["progress"] = (f"{page_no + 1}/{len(images)}페이지 · "
                               "양식 미인식 — 전체 추출 중 (가장 오래 걸리는 단계)")
             jobs.write_status(job_id, st)
+            fields = _recognize_freeform(data)
             results.append({"page": page_no, "aligned": None, "template": None,
-                            "fields": _recognize_freeform(data)})
+                            "fields": fields,
+                            "warnings": [] if fields else
+                            ["문서에서 양식 항목을 찾지 못했습니다 — 문서 사진이 맞는지 확인하세요"]})
         jobs.write_results(job_id, results)
 
 
@@ -172,6 +175,13 @@ def _second_pass(crop_png: bytes, f: dict, value: str, conf: float):
 
 
 def _recognize_freeform(data: bytes) -> list:
+    from PIL import Image
+    img = Image.open(io.BytesIO(data))
+    if img.width > 1600:  # 대형 사진은 축소 — 문서 텍스트 판독에 충분하고 훨씬 빠름
+        img.thumbnail((1600, 2400))
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, "PNG")
+        data = buf.getvalue()
     raw = llm.ask_image(data, (
         "이 문서 양식의 모든 항목을 읽어라. 인쇄된 라벨을 키로, 손글씨 값을 값으로 하는 "
         'JSON 객체 하나만 출력하라. 예: {"성명": "홍길동"}. 다른 텍스트 금지.'))
