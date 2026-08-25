@@ -194,6 +194,10 @@ def _second_pass(crop_png: bytes, f: dict, value: str, conf: float):
 
     - number + min/max 선언: 범위 밖이면 한글 손글씨 삐침(1 오인) 보정
     - phone: 마지막 자리가 혼동 쌍(7/9)이면 이지선다 재질문으로 확정
+
+    확대 배율을 바꿔 재질문하는 방식은 실험 결과 배율마다 다른 후보를
+    확신 있게 내놓아(같은 crop이 1.15x=없음/2x=이순덕/2.3x=이관희) 오히려
+    그럴듯한 오답을 만들었다 — 빈 값 + 낮은 신뢰도로 검수에 넘기는 게 정직하다.
     """
     if f["type"] == "number" and ("min" in f or "max" in f):
         value, conf = postprocess.clamp_number(
