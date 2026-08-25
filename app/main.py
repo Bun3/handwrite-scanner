@@ -203,6 +203,17 @@ async def template_add_candidate(name: str, body: dict):
                                                    body["field_id"], body["value"])}
 
 
+@app.delete("/api/jobs/{job_id}")
+def job_delete(job_id: str):
+    st = jobs.status(_safe(job_id))
+    if not st:
+        raise HTTPException(404, "작업 없음")
+    if st["state"] == "running":
+        raise HTTPException(409, "처리 중인 작업은 삭제할 수 없습니다. 완료 후 삭제하세요.")
+    jobs.delete(job_id)
+    return {"ok": True}
+
+
 @app.get("/api/jobs/{job_id}/page/{n}")
 def job_page(job_id: str, n: int):
     return FileResponse(JOBS_DIR / _safe(job_id) / f"page_{n:03d}.png")

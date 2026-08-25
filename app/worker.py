@@ -31,6 +31,8 @@ def _loop() -> None:
     while True:
         job_id = _q.get()
         st = jobs.status(job_id)
+        if st is None:  # 큐 대기 중 삭제된 작업
+            continue
         try:
             st["state"] = "running"
             jobs.write_status(job_id, st)

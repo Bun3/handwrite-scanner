@@ -110,7 +110,9 @@ async function refresh() {
     tr.innerHTML = `<td>${esc(s.id)}</td><td>${esc(s.template || '-')}</td>
       <td><span class="badge ${esc(s.state)}">${esc(s.state)}</span></td>
       <td>${esc(s.progress || (s.error ? '오류' : ''))}</td>
-      <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}</td>`;
+      <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}
+      ${s.state !== 'running' ? `<button class="danger" style="padding:3px 10px;font-size:12px"
+        onclick="delJob('${esc(s.id)}')">삭제</button>` : ''}</td>`;
   }
 }
 
@@ -123,6 +125,13 @@ document.getElementById('up').onsubmit = async e => {
 async function health() {
   const h = await j('/api/health');
   document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 로딩 중(첫 작업 시 자동 기동)';
+}
+
+async function delJob(id) {
+  if (!confirm(`작업 ${id} 을(를) 삭제할까요? 인식 결과·PDF가 함께 삭제됩니다.`)) return;
+  const r = await fetch('/api/jobs/' + encodeURIComponent(id), { method: 'DELETE' });
+  if (!r.ok) alert((await r.json()).detail || '삭제 실패');
+  refresh();
 }
 
 async function phoneStart() {

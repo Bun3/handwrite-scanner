@@ -62,3 +62,8 @@ def list_jobs() -> list[dict]:
 
 def input_images(job_id: str) -> list:
     return sorted((JOBS_DIR / job_id / "input").iterdir())
+
+
+def delete(job_id: str) -> None:
+    import shutil
+    shutil.rmtree(JOBS_DIR / job_id, ignore_errors=True)
