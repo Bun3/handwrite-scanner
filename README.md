@@ -1,5 +1,7 @@
 # handwrite-scanner
 
+📖 **[사용 안내서](https://bun3.github.io/handwrite-scanner/)** · ⬇ **[다운로드 (Releases)](https://github.com/Bun3/handwrite-scanner/releases)**
+
 프린트된 양식에 손으로 작성한 문서 사진을 → 필드별 텍스트로 인식 → 검수 →
 **검색 가능한 PDF**로 만들어주는 localhost 웹앱. 모든 처리(비전-LLM 포함)가
 로컬 CPU에서 돌아가며 **데이터가 PC 밖으로 나가지 않는다**.
