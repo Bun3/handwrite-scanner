@@ -208,6 +208,29 @@ def job_page(job_id: str, n: int):
     return FileResponse(JOBS_DIR / _safe(job_id) / f"page_{n:03d}.png")
 
 
+@app.get("/api/export-merged")
+def export_merged(template: str, fmt: str = "csv"):
+    """해당 템플릿으로 인식된 완료 작업 전체를 하나의 표로 병합."""
+    if fmt not in ("md", "txt", "csv"):
+        raise HTTPException(400, "fmt는 md|txt|csv")
+    _safe(template)
+    job_list = []
+    for st in jobs.list_jobs():
+        if st["state"] != "done":
+            continue
+        res = jobs.results(st["id"])
+        if res and any((p.get("template") or st.get("template")) == template
+                       for p in res):
+            job_list.append((st, res))
+    if not job_list:
+        raise HTTPException(404, "해당 템플릿으로 완료된 작업 없음")
+    content, fname, mt = export.merged(template, job_list, fmt)
+    from urllib.parse import quote
+    return Response(content, media_type=mt, headers={
+        "Content-Disposition":
+            f"attachment; filename*=UTF-8''{quote(fname)}"})
+
+
 @app.get("/api/jobs/{job_id}/export")
 def job_export(job_id: str, fmt: str = "md"):
     if fmt not in ("md", "txt", "csv"):

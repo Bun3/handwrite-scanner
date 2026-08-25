@@ -1,6 +1,25 @@
-"""인식 결과를 표 형태 텍스트로 내보내기 (md / txt / csv)."""
+"""인식 결과를 표 형태 텍스트로 내보내기 (md / txt / csv). 작업 단위 + 통합(머지)."""
 import csv
 import io
+
+
+def merged(template: str, job_list: list[tuple[dict, list]], fmt: str
+           ) -> tuple[str, str, str]:
+    """같은 템플릿의 여러 작업을 하나로 병합. job_list: [(status, results)].
+
+    각 문서(페이지)에 작업ID·처리일시를 붙여 한 목록으로 만든 뒤 기존 형식 재사용.
+    """
+    pages = []
+    for st, res in job_list:
+        for page in res or []:
+            if (page.get("template") or st.get("template")) != template:
+                continue  # 혼합 작업에서 다른 양식 페이지 제외
+            fields = ([{"label": "작업ID", "value": st["id"]},
+                       {"label": "처리일시", "value": st.get("created", "")}]
+                      + page["fields"])
+            pages.append({"fields": fields})
+    content, _, mt = build(template, pages, fmt)
+    return content, f"{template}-통합.{fmt}", mt
 
 
 def build(job_id: str, res: list, fmt: str) -> tuple[str, str, str]:

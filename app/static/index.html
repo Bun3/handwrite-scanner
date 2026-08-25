@@ -38,6 +38,17 @@
   </div>
 </div>
 <div class="card">
+  <h3>통합 내보내기</h3>
+  <p class="hint">같은 양식으로 인식된 모든 문서를 하나의 표로 모아 내려받습니다 (문서 1장 = 1행).</p>
+  <select id="mTpl"></select>
+  <select id="mFmt">
+    <option value="csv">CSV (.csv)</option>
+    <option value="md">Markdown (.md)</option>
+    <option value="txt">텍스트 (.txt)</option>
+  </select>
+  <button class="secondary" onclick="mergedExport()">내려받기</button>
+</div>
+<div class="card">
   <h3>작업 목록</h3>
   <table id="jobs"><tr><th>ID</th><th>템플릿</th><th>상태</th><th>진행</th><th></th></tr></table>
 </div>
@@ -48,8 +59,14 @@ async function j(u, o) { const r = await fetch(u, o); return r.json(); }
 async function loadTpl() {
   const tpls = await j('/api/templates');
   document.getElementById('tplHint').style.display = tpls.length ? 'none' : '';
-  const sel = document.getElementById('tplSel');
-  for (const t of tpls) sel.add(new Option(t.name, t.name));
+  const sel = document.getElementById('tplSel'), m = document.getElementById('mTpl');
+  for (const t of tpls) { sel.add(new Option(t.name, t.name)); m.add(new Option(t.name, t.name)); }
+}
+
+function mergedExport() {
+  const t = document.getElementById('mTpl').value;
+  if (!t) return alert('템플릿이 없습니다');
+  location.href = `/api/export-merged?template=${encodeURIComponent(t)}&fmt=${document.getElementById('mFmt').value}`;
 }
 
 async function refresh() {

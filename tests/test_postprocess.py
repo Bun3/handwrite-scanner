@@ -62,6 +62,21 @@ def test_export_formats():
     assert "페이지,필드,값" in build("j1", res, "csv")[0]  # 구성 다름 → 세로 형식
 
 
+def test_export_merged():
+    from app.export import merged
+    j1 = ({"id": "job1", "created": "2026-08-25", "template": "휴가"},
+          [{"template": "휴가", "fields": [{"label": "성명", "value": "홍길동"}]}])
+    j2 = ({"id": "job2", "created": "2026-08-26", "template": None},
+          [{"template": "휴가", "fields": [{"label": "성명", "value": "김철수"}]},
+           {"template": "다른양식", "fields": [{"label": "성명", "value": "제외대상"}]}])
+    csv_out, fname, _ = merged("휴가", [j1, j2], "csv")
+    assert "페이지,작업ID,처리일시,성명" in csv_out
+    assert "1,job1,2026-08-25,홍길동" in csv_out
+    assert "2,job2,2026-08-26,김철수" in csv_out
+    assert "제외대상" not in csv_out          # 다른 양식 페이지 제외
+    assert fname == "휴가-통합.csv"
+
+
 def test_clamp_number():
     from app.postprocess import clamp_number
     assert clamp_number("7", 0.9, 0, 11) == ("7", 0.9)          # 범위 내 유지
