@@ -71,6 +71,9 @@ def _process(job_id: str, st: dict) -> None:
         else:
             import shutil
             shutil.copy(img_path, job_dir / f"page_{page_no:03d}.png")
+            st["progress"] = (f"{page_no + 1}/{len(images)}페이지 · "
+                              "양식 미인식 — 전체 추출 중 (가장 오래 걸리는 단계)")
+            jobs.write_status(job_id, st)
             results.append({"page": page_no, "aligned": None, "template": None,
                             "fields": _recognize_freeform(data)})
         jobs.write_results(job_id, results)
