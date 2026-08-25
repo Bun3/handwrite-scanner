@@ -21,7 +21,8 @@
   <button onclick="preview('searchable')">미리보기</button>
   <button onclick="pdf('searchable')">PDF 다운로드 (원본+텍스트층)</button>
   <!-- 깔끔한 문서(kind=clean)는 수요가 적어 버튼 숨김 — API로는 ?kind=clean 지원 유지 -->
-  <button class="secondary" onclick="location.href=`/api/jobs/${id}/original`">원본 다운로드</button>
+  <!-- 인라인 onclick에서 ${id}는 버튼 자신의 DOM id(빈 값)를 잡는다 — 반드시 함수 경유 -->
+  <button class="secondary" onclick="original()">원본 다운로드</button>
   <select id="expFmt">
     <option value="md">Markdown (.md)</option>
     <option value="txt">텍스트 (.txt)</option>
@@ -47,6 +48,12 @@ async function load() {
     h.textContent = `${page.page + 1} 페이지 — ` +
       (page.skipped ? '건너뜀 (지정 양식과 다른 서류)' :
        page.template ? `양식: ${page.template}` : '양식 자동 인식 안 됨 (템플릿 없이 추출)');
+    const view = document.createElement('a');
+    view.href = `/api/jobs/${id}/page/${page.page}`;
+    view.target = '_blank';
+    view.textContent = '원본 보기';
+    view.style.cssText = 'margin-left:10px;font-size:13px;font-weight:400';
+    h.appendChild(view);
     list.appendChild(h);
     for (const w of page.warnings || []) {
       const div = document.createElement('div');
@@ -112,6 +119,7 @@ function confClass(c) {
 }
 
 function pdf(kind) { location.href = `/api/jobs/${id}/pdf?kind=${kind}`; }
+function original() { location.href = `/api/jobs/${id}/original`; }
 function preview(kind) { window.open(`/api/jobs/${id}/pdf?kind=${kind}&inline=1`); }
 function exportFile() {
   location.href = `/api/jobs/${id}/export?fmt=${document.getElementById('expFmt').value}`;
