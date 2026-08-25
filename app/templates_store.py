@@ -21,10 +21,13 @@ def get(name: str) -> dict | None:
     return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
 
 
-def save(name: str, fields: list[dict]) -> dict:
+def save(name: str, fields: list[dict], rules: list[str] | None = None) -> dict:
     d = TEMPLATES_DIR / name
     d.mkdir(parents=True, exist_ok=True)
-    tpl = {"name": name, "reference": "reference.png", "fields": fields}
+    if rules is None:  # 미전달 시 기존 규칙 유지
+        rules = (get(name) or {}).get("rules", [])
+    tpl = {"name": name, "reference": "reference.png", "fields": fields,
+           "rules": rules}
     (d / "template.json").write_text(
         json.dumps(tpl, ensure_ascii=False, indent=2), encoding="utf-8")
     return tpl

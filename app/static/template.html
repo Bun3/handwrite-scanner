@@ -24,7 +24,9 @@
   <div id="canvasWrap"><canvas id="cv"></canvas></div>
   <h3>필드 목록</h3>
   <table id="fields"><tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr></table>
-  <br><button onclick="saveTpl()">저장</button> <span id="saved" class="hint"></span>
+  <h3>검증 규칙 <span class="hint" style="font-weight:400">(선택 — 줄바꿈 구분, 필드 id를 변수로 쓰는 산술·비교식. 예: <code>pre - post >= 0</code>)</span></h3>
+  <textarea id="rules" rows="2" style="width:100%" placeholder="위반 시 관련 필드가 검수에서 강조됩니다"></textarea>
+  <br><br><button onclick="saveTpl()">저장</button> <span id="saved" class="hint"></span>
 </div>
 </main>
 <script>
@@ -55,7 +57,9 @@ async function createTpl() {
 async function openTpl(n) {
   name = n;
   const tpls = await j('/api/templates');
-  fields = (tpls.find(t => t.name === n) || {}).fields || [];
+  const tpl = tpls.find(t => t.name === n) || {};
+  fields = tpl.fields || [];
+  document.getElementById('rules').value = (tpl.rules || []).join('\n');
   img = new Image();
   img.onload = () => {
     scale = Math.min(1, 950 / img.width);
@@ -129,11 +133,14 @@ function renderFields() {
 
 async function saveTpl() {
   // 저장 시 candidates 타입인데 후보가 비면 text로 강등하지 않고 그대로 저장(엔진이 무시)
-  await fetch('/api/templates/' + encodeURIComponent(name), {
+  const rules = document.getElementById('rules').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const r = await fetch('/api/templates/' + encodeURIComponent(name), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields })
+    body: JSON.stringify({ fields, rules })
   });
-  document.getElementById('saved').textContent = '저장됨 ' + new Date().toLocaleTimeString();
+  document.getElementById('saved').textContent = r.ok
+    ? '저장됨 ' + new Date().toLocaleTimeString()
+    : '⚠ ' + (await r.json()).detail;
 }
 
 async function delTpl() {

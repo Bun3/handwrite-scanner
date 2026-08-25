@@ -64,8 +64,10 @@ def _process(job_id: str, st: dict) -> None:
         if tpl:
             fields = _recognize_fields(job_id, st, tpl, aligned, page_no,
                                        len(images), job_dir)
+            warnings = _apply_rules(tpl, fields)
             results.append({"page": page_no, "aligned": ok,
-                            "template": tpl["name"], "fields": fields})
+                            "template": tpl["name"], "fields": fields,
+                            "warnings": warnings})
         else:
             import shutil
             shutil.copy(img_path, job_dir / f"page_{page_no:03d}.png")
@@ -95,6 +97,23 @@ def _recognize_fields(job_id, st, tpl, aligned, page_no, total_pages, job_dir):
                     "box": f["box"], "raw": raw, "value": value,
                     "confidence": round(conf, 2)})
     return out
+
+
+def _apply_rules(tpl: dict, fields: list) -> list[str]:
+    """교차 필드 검증. 위반 규칙의 관련 필드는 신뢰도를 낮춰 검수 강조."""
+    from app import rules as rules_mod
+    warnings = []
+    values = {f["id"]: f["value"] for f in fields}
+    for expr in tpl.get("rules", []):
+        try:
+            if rules_mod.check(expr, values) is False:
+                warnings.append(f"검증 실패: {expr}")
+                for f in fields:
+                    if f["id"] in rules_mod.rule_ids(expr):
+                        f["confidence"] = min(f["confidence"], 0.5)
+        except (SyntaxError, ValueError):
+            warnings.append(f"규칙 오류: {expr}")
+    return warnings
 
 
 def _prompt(f: dict) -> str:

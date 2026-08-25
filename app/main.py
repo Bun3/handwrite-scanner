@@ -86,7 +86,14 @@ async def template_create(name: str = Form(...), file: UploadFile = None):
 
 @app.put("/api/templates/{name}")
 async def template_update(name: str, body: dict):
-    return templates_store.save(_safe(name), body["fields"])
+    rules = body.get("rules")
+    if rules:
+        from app.rules import validate_expr
+        for expr in rules:
+            err = validate_expr(expr)
+            if err:
+                raise HTTPException(400, f"규칙 오류 '{expr}': {err}")
+    return templates_store.save(_safe(name), body["fields"], rules)
 
 
 @app.get("/api/templates/{name}/reference")
