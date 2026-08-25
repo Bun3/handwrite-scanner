@@ -62,7 +62,7 @@ async function load() {
       label.textContent = f.label + (f.confidence < 0.7 ? ' ⚠' : '');
       row.appendChild(label);
       if (f.box) {
-        const [x, y, w, hh] = f.box, pad = 8;
+        const [x, y, w, hh] = f.box, pad = Math.max(8, pageImg.width / 100 | 0);
         const c = document.createElement('canvas');
         const cw = Math.min(w + pad * 2, pageImg.width - x + pad), ch = hh + pad * 2;
         c.width = cw; c.height = ch;

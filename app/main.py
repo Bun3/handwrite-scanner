@@ -122,6 +122,11 @@ async def template_update(name: str, body: dict):
             err = validate_expr(expr)
             if err:
                 raise HTTPException(400, f"규칙 오류 '{expr}': {err}")
+    for f in body["fields"]:
+        # circle은 인쇄된 선택지 목록이 프롬프트·보정의 전제 — 없으면 인식이 망가진다
+        if f.get("type") == "circle" and not f.get("candidates"):
+            raise HTTPException(400, f"'{f.get('label', f.get('id'))}' 필드: "
+                                "circle 타입은 선택지 후보 입력이 필요합니다")
     return templates_store.save(_safe(name), body["fields"], rules)
 
 

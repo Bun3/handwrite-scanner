@@ -12,7 +12,10 @@ from app.align import HAVE_CV2, best_template, to_reference
 _q: "queue.Queue[str]" = queue.Queue()
 _cancel: set[str] = set()
 
-PAD = 8  # 필드 crop 여백(px)
+def _pad(img_width: int) -> int:
+    """필드 crop 여백. 고정 px는 300dpi 스캔에서 1mm도 안 돼 경계에 걸친
+    글씨가 잘리므로 이미지 폭에 비례(약 2mm)시킨다."""
+    return max(8, img_width // 100)
 
 
 class _Cancelled(Exception):
@@ -122,8 +125,9 @@ def _recognize_fields(job_id, st, tpl, aligned, page_no, total_pages, job_dir):
         st["progress"] = f"{page_no + 1}/{total_pages}페이지 · {i + 1}/{len(tpl['fields'])} {f['label']}"
         jobs.write_status(job_id, st)
         x, y, w, h = f["box"]
-        crop = aligned.crop((max(0, x - PAD), max(0, y - PAD),
-                             x + w + PAD, y + h + PAD))
+        pad = _pad(aligned.width)
+        crop = aligned.crop((max(0, x - pad), max(0, y - pad),
+                             x + w + pad, y + h + pad))
         if crop.width < 1000:  # 작은 crop은 VLM 인식률이 떨어짐 → 업스케일
             s = min(3, 1000 / crop.width)
             crop = crop.resize((int(crop.width * s), int(crop.height * s)))

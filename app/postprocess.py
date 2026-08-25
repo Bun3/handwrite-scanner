@@ -32,10 +32,13 @@ def similarity(a: str, b: str) -> float:
 
 def match_candidate(text: str, candidates: list[str]) -> tuple[str, float]:
     """후보 목록에서 최근접 선택. 반환: (후보, 신뢰도=유사도)."""
+    t = normalize_ws(text)
+    if not t or t == "없음":  # 빈칸 응답을 후보로 강제 매칭하면 오답이 그럴듯해짐
+        return "", 0.3
     if not candidates:
-        return text, 0.5
-    best = max(candidates, key=lambda c: similarity(text, c))
-    return best, similarity(text, best)
+        return t, 0.5
+    best = max(candidates, key=lambda c: similarity(t, c))
+    return best, similarity(t, best)
 
 
 _DIGIT_FIX = str.maketrans("OoIlZzSsBg", "0011225589")
@@ -44,6 +47,8 @@ _DIGIT_FIX = str.maketrans("OoIlZzSsBg", "0011225589")
 def validate(text: str, field_type: str) -> tuple[str, float]:
     """타입별 정규화. 반환: (정규화 값, 신뢰도)."""
     t = normalize_ws(text)
+    if not t or t == "없음":  # 빈칸 — 값 비우고 검수 강조
+        return "", 0.3
     if field_type == "phone":
         digits = re.sub(r"\D", "", t.translate(_DIGIT_FIX))
         if len(digits) == 11 and digits.startswith("01"):

@@ -42,6 +42,17 @@ def test_submit_wait_export_delete(tmp_path, capsys):
     run(capsys, "jobs", "delete", job_id)
 
 
+def test_circle_requires_candidates(tmp_path, capsys):
+    _ensure_template()
+    bad = tmp_path / "fields.json"
+    bad.write_text(json.dumps([{"id": "c1", "label": "선택", "type": "circle",
+                                "box": [0, 0, 10, 10], "candidates": []}]),
+                   encoding="utf-8")
+    with pytest.raises(SystemExit):
+        cli.main(["templates", "update", TEMPLATE, "--fields", str(bad)])
+    assert "후보" in capsys.readouterr().err
+
+
 def test_server_down_error(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--server", "http://127.0.0.1:59999", "health"])

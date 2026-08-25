@@ -45,6 +45,15 @@ def test_version_compare():
     assert not _ver("v0.1.0") > _ver("0.1.0")
 
 
+def test_empty_answer_not_forced():
+    """모델이 '없음'(빈칸)이라 답하면 후보로 강제 매칭하지 않고 빈 값 + 검수 강조."""
+    from app.postprocess import match_candidate, validate
+    assert match_candidate("없음", ["이경근", "이순덕"]) == ("", 0.3)
+    assert match_candidate("  ", ["이경근"]) == ("", 0.3)
+    assert validate("없음", "text") == ("", 0.3)
+    assert validate("없음", "phone") == ("", 0.3)
+
+
 def test_export_formats():
     from app.export import build
     res = [{"fields": [{"label": "성명", "value": "홍길동"},
