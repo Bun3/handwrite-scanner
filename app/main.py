@@ -208,6 +208,29 @@ def job_page(job_id: str, n: int):
     return FileResponse(JOBS_DIR / _safe(job_id) / f"page_{n:03d}.png")
 
 
+@app.get("/api/search")
+def search(q: str):
+    """전 작업의 인식 결과에서 부분 문자열 검색.
+
+    ponytail: 파일 전수 스캔 — 작업 수천 건 넘어가면 인덱스 도입.
+    """
+    q = q.strip().lower()
+    if not q:
+        return []
+    hits = []
+    for st in jobs.list_jobs():
+        for page in jobs.results(st["id"]) or []:
+            for f in page["fields"]:
+                if q in str(f.get("value", "")).lower():
+                    hits.append({"job": st["id"], "page": page["page"],
+                                 "template": page.get("template") or st.get("template"),
+                                 "label": f["label"], "value": f["value"],
+                                 "created": st.get("created", "")})
+                    if len(hits) >= 200:
+                        return hits
+    return hits
+
+
 @app.get("/api/export-merged")
 def export_merged(template: str, fmt: str = "csv"):
     """해당 템플릿으로 인식된 완료 작업 전체를 하나의 표로 병합."""

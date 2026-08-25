@@ -38,6 +38,14 @@
   </div>
 </div>
 <div class="card">
+  <h3>문서 검색</h3>
+  <form id="sf" style="display:flex;gap:8px">
+    <input id="sq" placeholder="인식된 내용으로 검색 (예: 홍길동)" style="flex:1">
+    <button>검색</button>
+  </form>
+  <table id="sr" style="display:none"><tr><th>값</th><th>필드</th><th>양식</th><th>처리일시</th><th></th></tr></table>
+</div>
+<div class="card">
   <h3>통합 내보내기</h3>
   <p class="hint">같은 양식으로 인식된 모든 문서를 하나의 표로 모아 내려받습니다 (문서 1장 = 1행).</p>
   <select id="mTpl"></select>
@@ -62,6 +70,20 @@ async function loadTpl() {
   const sel = document.getElementById('tplSel'), m = document.getElementById('mTpl');
   for (const t of tpls) { sel.add(new Option(t.name, t.name)); m.add(new Option(t.name, t.name)); }
 }
+
+document.getElementById('sf').onsubmit = async e => {
+  e.preventDefault();
+  const hits = await j('/api/search?q=' + encodeURIComponent(document.getElementById('sq').value));
+  const tb = document.getElementById('sr');
+  tb.style.display = '';
+  tb.innerHTML = '<tr><th>값</th><th>필드</th><th>양식</th><th>처리일시</th><th></th></tr>';
+  if (!hits.length) { tb.insertRow().innerHTML = '<td colspan="5" class="hint">결과 없음</td>'; return; }
+  for (const h of hits) {
+    tb.insertRow().innerHTML = `<td><b>${h.value}</b></td><td>${h.label}</td>
+      <td>${h.template || '-'}</td><td>${h.created}</td>
+      <td><a href="review.html?id=${h.job}">열기 (${h.page + 1}p)</a></td>`;
+  }
+};
 
 function mergedExport() {
   const t = document.getElementById('mTpl').value;
