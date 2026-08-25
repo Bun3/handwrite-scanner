@@ -2,14 +2,19 @@
 
 일반 실행   : handwrite-scanner.exe            (이 PC 전용, localhost)
 서버 모드   : handwrite-scanner.exe --server   (사내 다른 PC가 브라우저로 접속)
+CLI 모드    : handwrite-scanner.exe cli ...    (스크립트·AI 에이전트용, 서버 필요)
 """
 import argparse
 import socket
+import sys
 import threading
 import webbrowser
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "cli":
+        from cli import main as cli_main
+        sys.exit(cli_main(sys.argv[2:]))
     p = argparse.ArgumentParser()
     p.add_argument("--server", action="store_true",
                    help="사내망의 다른 PC에서 접속 허용 (0.0.0.0 바인드)")
