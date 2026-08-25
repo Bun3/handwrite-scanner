@@ -113,7 +113,8 @@ async function refresh() {
   for (const s of jobs) {
     const tr = tb.insertRow();
     tr.innerHTML = `<td>${esc(s.id)}</td><td>${esc(s.template || '-')}</td>
-      <td><span class="badge ${esc(s.state)}">${esc(s.state)}</span></td>
+      <td><span class="badge ${esc(s.state)}">${esc({queued:'대기', running:'처리 중',
+        done:'완료', error:'오류', cancelled:'중단됨'}[s.state] || s.state)}</span></td>
       <td>${esc(s.progress || (s.error ? '오류' : ''))}</td>
       <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}
       ${['running', 'queued'].includes(s.state) ? `<button class="secondary" style="padding:3px 10px;font-size:12px"
