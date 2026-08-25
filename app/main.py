@@ -107,6 +107,49 @@ def template_delete(name: str):
     return {"ok": True}
 
 
+@app.post("/api/templates/{name}/autodetect")
+def template_autodetect(name: str):
+    """기준 이미지에서 입력란을 VLM으로 감지해 필드 초안 반환 (베타 — 사람이 조정)."""
+    import io
+    import json as _json
+    import re as _re
+
+    from PIL import Image
+    ref = templates_store.reference_path(_safe(name))
+    if not ref.exists():
+        raise HTTPException(404, "기준 이미지 없음")
+    img = Image.open(ref)
+    W, H = img.size
+    small = img.copy()
+    small.thumbnail((1000, 1400))
+    buf = io.BytesIO()
+    small.save(buf, "PNG")
+    raw = llm.ask_image(buf.getvalue(), (
+        "이 문서 양식에서 사람이 손글씨로 값을 적도록 비워 둔 입력란을 모두 찾아라. "
+        "각 입력란에 대해 인쇄된 라벨 텍스트와 빈칸 영역의 경계 상자를 구하라. "
+        "좌표는 이미지 좌상단 기준 0~1000 상대좌표의 [x0,y0,x1,y1]이다. "
+        '결과는 JSON 배열로만 출력하라: [{"label":"성명","box":[x0,y0,x1,y1]}]'))
+    m = _re.search(r"\[.*\]", raw, _re.S)
+    try:
+        items = _json.loads(m.group()) if m else []
+    except _json.JSONDecodeError:
+        raise HTTPException(502, "감지 결과 해석 실패 — 다시 시도해 보세요")
+    fields = []
+    for i, it in enumerate(items):
+        try:
+            x0, y0, x1, y1 = [float(v) for v in it["box"]]
+        except (KeyError, TypeError, ValueError):
+            continue
+        fields.append({
+            "id": f"auto{i}", "label": str(it.get("label", f"필드{i + 1}")),
+            "type": "text",
+            "box": [int(x0 / 1000 * W), int(y0 / 1000 * H),
+                    max(10, int((x1 - x0) / 1000 * W)),
+                    max(10, int((y1 - y0) / 1000 * H))],
+            "candidates": []})
+    return {"fields": fields}
+
+
 # ---------- 작업 ----------
 
 @app.post("/api/jobs")

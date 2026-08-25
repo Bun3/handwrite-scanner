@@ -22,7 +22,9 @@
 </div>
 <div class="card" id="editor" style="display:none">
   <div id="canvasWrap"><canvas id="cv"></canvas></div>
-  <h3>필드 목록</h3>
+  <h3>필드 목록
+    <button class="secondary" id="adBtn" onclick="autoDetect()" style="font-size:13px">✨ 자동 필드 감지 (베타)</button>
+  </h3>
   <table id="fields"><tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr></table>
   <h3>검증 규칙 <span class="hint" style="font-weight:400">(선택 — 줄바꿈 구분, 필드 id를 변수로 쓰는 산술·비교식. 예: <code>pre - post >= 0</code>)</span></h3>
   <textarea id="rules" rows="2" style="width:100%" placeholder="위반 시 관련 필드가 검수에서 강조됩니다"></textarea>
@@ -129,6 +131,18 @@ function renderFields() {
       <td><button class="danger" onclick="fields.splice(${i},1);renderFields();draw()">삭제</button></td>`;
   });
   draw();
+}
+
+async function autoDetect() {
+  if (fields.length && !confirm('기존 필드 목록을 감지 결과로 대체합니다. 계속할까요?')) return;
+  const b = document.getElementById('adBtn');
+  b.disabled = true; b.textContent = '감지 중... (엔진 상태에 따라 수 분)';
+  try {
+    const r = await fetch('/api/templates/' + encodeURIComponent(name) + '/autodetect', { method: 'POST' });
+    if (!r.ok) { alert((await r.json()).detail || '감지 실패'); return; }
+    fields = (await r.json()).fields;
+    renderFields();
+  } finally { b.disabled = false; b.textContent = '✨ 자동 필드 감지 (베타)'; }
 }
 
 async function saveTpl() {
