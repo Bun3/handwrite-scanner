@@ -125,14 +125,32 @@ def job_get(job_id: str):
 
 @app.patch("/api/jobs/{job_id}/fields")
 async def job_field_update(job_id: str, body: dict):
-    """검수 수정: {page, id, value}"""
+    """검수 수정: {page, id, value}. 후보 타입인데 목록에 없는 값이면 학습 제안."""
     res = jobs.results(_safe(job_id))
-    for f in res[body["page"]]["fields"]:
+    page = res[body["page"]]
+    suggest = None
+    for f in page["fields"]:
         if f["id"] == body["id"]:
             f["value"] = body["value"]
             f["confidence"] = 1.0
+            tpl_name = page.get("template") or (jobs.status(job_id) or {}).get("template")
+            if (tpl_name and f.get("type") in ("candidates", "circle")
+                    and body["value"].strip()):
+                tpl = templates_store.get(tpl_name)
+                tf = next((x for x in (tpl or {}).get("fields", [])
+                           if x["id"] == f["id"]), None)
+                if tf is not None and body["value"] not in tf.get("candidates", []):
+                    suggest = {"template": tpl_name, "field_id": f["id"],
+                               "value": body["value"]}
     jobs.write_results(job_id, res)
-    return {"ok": True}
+    return {"ok": True, "suggest": suggest}
+
+
+@app.post("/api/templates/{name}/candidates")
+async def template_add_candidate(name: str, body: dict):
+    """{field_id, value} → 후보목록에 추가 (검수 학습)"""
+    return {"added": templates_store.add_candidate(_safe(name),
+                                                   body["field_id"], body["value"])}
 
 
 @app.get("/api/jobs/{job_id}/page/{n}")

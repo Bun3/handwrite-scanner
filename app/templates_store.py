@@ -47,6 +47,21 @@ def reference_path(name: str):
     return TEMPLATES_DIR / name / "reference.png"
 
 
+def add_candidate(name: str, field_id: str, value: str) -> bool:
+    """검수에서 학습된 후보를 목록에 추가. 반환: 실제 추가 여부."""
+    tpl = get(name)
+    if not tpl or not value.strip():
+        return False
+    for f in tpl["fields"]:
+        if f["id"] == field_id:
+            cands = f.setdefault("candidates", [])
+            if value not in cands:
+                cands.append(value)
+                save(name, tpl["fields"])
+                return True
+    return False
+
+
 def delete(name: str) -> None:
     import shutil
     shutil.rmtree(TEMPLATES_DIR / name, ignore_errors=True)

@@ -66,12 +66,26 @@ async function load() {
       inp.value = f.value || '';
       inp.title = 'LLM 원문: ' + (f.raw || '');
       inp.onchange = async () => {
-        await fetch(`/api/jobs/${id}/fields`, { method: 'PATCH',
+        const r = await (await fetch(`/api/jobs/${id}/fields`, { method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ page: page.page, id: f.id, value: inp.value }) });
+          body: JSON.stringify({ page: page.page, id: f.id, value: inp.value }) })).json();
         row.className = 'field-row c-green';   // 사람이 확인한 값 = 100%
         label.textContent = f.label;
         conf.textContent = '100%';
+        if (r.suggest) {           // 후보목록 학습 제안
+          const s = r.suggest, btn = document.createElement('button');
+          btn.className = 'secondary';
+          btn.textContent = `후보목록에 '${s.value}' 추가`;
+          btn.onclick = async () => {
+            await fetch(`/api/templates/${encodeURIComponent(s.template)}/candidates`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ field_id: s.field_id, value: s.value }) });
+            btn.replaceWith(Object.assign(document.createElement('span'),
+              { className: 'hint', textContent: '✓ 추가됨' }));
+          };
+          row.querySelector('button')?.remove();
+          row.appendChild(btn);
+        }
       };
       row.appendChild(inp);
       const conf = document.createElement('span');
