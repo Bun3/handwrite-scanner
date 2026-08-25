@@ -53,6 +53,21 @@ def update_info():
     return _update
 
 
+# ---------- 폰 업로드 ----------
+
+@app.post("/api/phone/start")
+def phone_start():
+    from app import phone
+    return phone.start()
+
+
+@app.post("/api/phone/stop")
+def phone_stop():
+    from app import phone
+    phone.stop()
+    return {"ok": True}
+
+
 # ---------- 템플릿 ----------
 
 @app.get("/api/templates")

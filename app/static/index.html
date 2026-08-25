@@ -28,6 +28,14 @@
     <button>인식 시작</button>
   </form>
   <p class="hint">CPU에서 문서 1장당 몇 분 걸립니다. 여러 장을 걸어두고 나중에 검수하세요.</p>
+  <button class="secondary" onclick="phoneStart()">📱 폰으로 촬영 업로드</button>
+  <div id="phoneBox" style="display:none; margin-top:14px; text-align:center">
+    <p>같은 Wi-Fi에서 휴대폰 카메라로 QR을 찍어 접속하세요.<br>
+    <span class="hint">이 창을 닫으면 연결이 다시 차단됩니다. (최초 1회 방화벽 허용 필요)</span></p>
+    <img id="phoneQr" width="220" height="220" alt="QR">
+    <p class="hint" id="phoneUrl"></p>
+    <button class="danger" onclick="phoneStop()">폰 업로드 끄기</button>
+  </div>
 </div>
 <div class="card">
   <h3>작업 목록</h3>
@@ -66,6 +74,18 @@ document.getElementById('up').onsubmit = async e => {
 async function health() {
   const h = await j('/api/health');
   document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 로딩 중(첫 작업 시 자동 기동)';
+}
+
+async function phoneStart() {
+  const d = await j('/api/phone/start', { method: 'POST' });
+  document.getElementById('phoneQr').src = d.qr;
+  document.getElementById('phoneUrl').textContent = d.url;
+  document.getElementById('phoneBox').style.display = '';
+}
+
+async function phoneStop() {
+  await fetch('/api/phone/stop', { method: 'POST' });
+  document.getElementById('phoneBox').style.display = 'none';
 }
 
 async function updateCheck() {
