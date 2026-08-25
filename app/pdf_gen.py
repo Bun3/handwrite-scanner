@@ -94,12 +94,20 @@ def _clean(job_id: str, res: list, out) -> None:
     """빈 양식 배경 + 인식 텍스트 활자 조판. 템플릿 없는 작업은 text 형식으로 폴백."""
     import numpy as np
     st = jobs.status(job_id)
-    ref = templates_store.reference_path(st["template"]) if st.get("template") else None
-    if not (ref and ref.exists()):
+    tpl_names = {p.get("template") or st.get("template") for p in res}
+    darks = {}
+    for name in tpl_names:
+        ref = templates_store.reference_path(name) if name else None
+        if ref and ref.exists():
+            darks[name] = (ref, np.array(Image.open(ref).convert("L")) < 128)
+    if not darks:
         return _text(job_id, res, out)
-    dark = np.array(Image.open(ref).convert("L")) < 128
     c = None
     for page in res:
+        name = page.get("template") or st.get("template")
+        if name not in darks:
+            continue  # 템플릿 없는 페이지는 clean 조판 불가 → 생략
+        ref, dark = darks[name]
         c, pw, ph, scale = _page_canvas(c, ref, out)
         for f in page["fields"]:
             if not f.get("box") or not f.get("value"):

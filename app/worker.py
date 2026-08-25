@@ -7,7 +7,7 @@ import threading
 import traceback
 
 from app import jobs, llm, postprocess, templates_store
-from app.align import to_reference
+from app.align import best_template, to_reference
 
 _q: "queue.Queue[str]" = queue.Queue()
 
@@ -44,30 +44,37 @@ def _loop() -> None:
 
 
 def _process(job_id: str, st: dict) -> None:
-    tpl = templates_store.get(st["template"]) if st.get("template") else None
+    tpl_fixed = templates_store.get(st["template"]) if st.get("template") else None
+    detect_pool = None
+    if not tpl_fixed:  # 템플릿 미지정 = 페이지별 자동 판별 (실패 시 freeform)
+        detect_pool = [(t, templates_store.reference_path(t["name"]))
+                       for t in templates_store.list_templates()]
     images = jobs.input_images(job_id)
     results = []
     job_dir = jobs.JOBS_DIR / job_id
     for page_no, img_path in enumerate(images):
         data = img_path.read_bytes()
+        tpl, aligned, ok = tpl_fixed, None, None
+        if tpl_fixed:
+            aligned, ok = to_reference(
+                data, templates_store.reference_path(tpl_fixed["name"]))
+        elif detect_pool:
+            tpl, aligned = best_template(data, detect_pool)
+            ok = tpl is not None
         if tpl:
-            fields = _recognize_with_template(job_id, st, tpl, data, page_no,
-                                              len(images), job_dir)
-            aligned_ok = fields.pop("_aligned")
-            results.append({"page": page_no, "aligned": aligned_ok,
-                            "fields": fields["fields"]})
+            fields = _recognize_fields(job_id, st, tpl, aligned, page_no,
+                                       len(images), job_dir)
+            results.append({"page": page_no, "aligned": ok,
+                            "template": tpl["name"], "fields": fields})
         else:
             import shutil
             shutil.copy(img_path, job_dir / f"page_{page_no:03d}.png")
-            results.append({"page": page_no, "aligned": None,
+            results.append({"page": page_no, "aligned": None, "template": None,
                             "fields": _recognize_freeform(data)})
         jobs.write_results(job_id, results)
 
 
-def _recognize_with_template(job_id, st, tpl, data, page_no, total_pages,
-                             job_dir):
-    aligned, ok = to_reference(
-        data, templates_store.reference_path(tpl["name"]))
+def _recognize_fields(job_id, st, tpl, aligned, page_no, total_pages, job_dir):
     aligned.save(job_dir / f"page_{page_no:03d}.png")
     out = []
     for i, f in enumerate(tpl["fields"]):
@@ -87,7 +94,7 @@ def _recognize_with_template(job_id, st, tpl, data, page_no, total_pages,
         out.append({"id": f["id"], "label": f["label"], "type": f["type"],
                     "box": f["box"], "raw": raw, "value": value,
                     "confidence": round(conf, 2)})
-    return {"fields": out, "_aligned": ok}
+    return out
 
 
 def _prompt(f: dict) -> str:

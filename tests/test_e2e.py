@@ -39,10 +39,8 @@ def _ensure_template():
               json={"fields": fields}, timeout=30).raise_for_status()
 
 
-@pytest.mark.skipif(not _server_up(), reason="서버 미기동")
-def test_dummy_vacation_form():
-    _ensure_template()
-    r = httpx.post(BASE + "/api/jobs", data={"template": TEMPLATE},
+def _run_job(template: str) -> dict:
+    r = httpx.post(BASE + "/api/jobs", data={"template": template},
                    files=[("files", ("dummy-filled.png",
                            open(f"{FIX}/dummy-filled.png", "rb"), "image/png"))])
     job_id = r.json()["id"]
@@ -53,8 +51,27 @@ def test_dummy_vacation_form():
             break
         time.sleep(10)
     assert d["status"]["state"] == "done", d["status"].get("error")
+    return d
+
+
+def _assert_truth(d: dict):
     got = {f["label"]: f["value"] for f in d["results"][0]["fields"]}
     norm = lambda s: " ".join(s.split())
     wrong = {k: (got.get(k), v) for k, v in TRUTH.items()
              if norm(got.get(k, "")) != norm(v)}
     assert not wrong, f"불일치: {wrong}"
+
+
+@pytest.mark.skipif(not _server_up(), reason="서버 미기동")
+def test_dummy_vacation_form():
+    _ensure_template()
+    _assert_truth(_run_job(TEMPLATE))
+
+
+@pytest.mark.skipif(not _server_up(), reason="서버 미기동")
+def test_auto_detect_template():
+    """템플릿 미지정 업로드 → 페이지별 자동 판별로 같은 결과."""
+    _ensure_template()
+    d = _run_job("")
+    assert d["results"][0]["template"] == TEMPLATE
+    _assert_truth(d)
