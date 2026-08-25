@@ -1,0 +1,242 @@
+<title>handwrite-scanner 사용 안내</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #F9FAFB;
+  --card: #FFFFFF;
+  --ink: #1F2933;
+  --muted: #5B6B7A;
+  --line: #DCE1E7;
+  --accent: #2C6BC9;
+  --accent-soft: #EAF1FB;
+  --good: #3D8B4F; --good-bg: #EAF6EC;
+  --warn1: #948420; --warn1-bg: #FDFAE3;
+  --warn2: #B07018; --warn2-bg: #FDF3E4;
+  --bad: #B3423A; --bad-bg: #FBEAEA;
+  --code-bg: #EFF2F5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #14181D; --card: #1B2129; --ink: #E4E9EE; --muted: #93A1AE;
+    --line: #2E3843; --accent: #6BA3EE; --accent-soft: #1E2C40;
+    --good: #7CC98B; --good-bg: #1C2B20;
+    --warn1: #CFC066; --warn1-bg: #2B2818;
+    --warn2: #DCA75C; --warn2-bg: #2E2517;
+    --bad: #E08B84; --bad-bg: #33201E;
+    --code-bg: #232B34;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #14181D; --card: #1B2129; --ink: #E4E9EE; --muted: #93A1AE;
+  --line: #2E3843; --accent: #6BA3EE; --accent-soft: #1E2C40;
+  --good: #7CC98B; --good-bg: #1C2B20;
+  --warn1: #CFC066; --warn1-bg: #2B2818;
+  --warn2: #DCA75C; --warn2-bg: #2E2517;
+  --bad: #E08B84; --bad-bg: #33201E;
+  --code-bg: #232B34;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+  font-size: 16px; line-height: 1.75;
+}
+.wrap { max-width: 720px; margin: 0 auto; padding: 56px 24px 96px; }
+header.doc { border-bottom: 2px solid var(--ink); padding-bottom: 28px; margin-bottom: 40px; }
+.kicker { font-size: 13px; font-weight: 500; letter-spacing: .14em; color: var(--accent); text-transform: uppercase; }
+h1 { font-size: 34px; font-weight: 700; line-height: 1.25; margin: 8px 0 10px; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 60ch; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 22px; font-size: 14px; }
+nav.toc a { color: var(--accent); text-decoration: none; font-weight: 500; }
+nav.toc a:hover, nav.toc a:focus-visible { text-decoration: underline; }
+h2 { font-size: 22px; font-weight: 700; margin: 56px 0 14px; line-height: 1.3; text-wrap: balance;
+     display: flex; align-items: baseline; gap: 12px; }
+h2 .step { flex: none; font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 500;
+           color: var(--accent); border: 1px solid var(--accent); border-radius: 999px;
+           padding: 1px 10px; transform: translateY(-2px); }
+h3 { font-size: 17px; font-weight: 700; margin: 28px 0 8px; }
+p { margin: 0 0 14px; max-width: 66ch; }
+ul, ol { margin: 0 0 14px; padding-left: 24px; }
+li { margin-bottom: 6px; }
+code { font-family: 'IBM Plex Mono', Consolas, monospace; font-size: .88em;
+       background: var(--code-bg); border-radius: 4px; padding: 1px 6px; }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0 4px;
+        font-size: 14px; font-weight: 500; }
+.flow span { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; }
+.flow em { font-style: normal; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 14px 0 20px; }
+.tablewrap { overflow-x: auto; }
+th { text-align: left; font-size: 13px; letter-spacing: .05em; color: var(--muted);
+     border-bottom: 2px solid var(--line); padding: 8px 12px 6px; white-space: nowrap; }
+td { border-bottom: 1px solid var(--line); padding: 9px 12px; vertical-align: top; }
+td:first-child { white-space: nowrap; font-weight: 500; }
+.note, .tip { border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 14.5px; }
+.note { background: var(--warn2-bg); border-left: 3px solid var(--warn2); }
+.tip { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+.note b, .tip b { display: block; margin-bottom: 2px; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px;
+          vertical-align: -1px; }
+.conf td:first-child { font-weight: 500; }
+kbd-path, .path { font-family: 'IBM Plex Mono', monospace; font-size: .88em; }
+footer.doc { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--line);
+             color: var(--muted); font-size: 13px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+<header class="doc">
+  <div class="kicker">사용 안내</div>
+  <h1>handwrite-scanner</h1>
+  <p class="lede">프린트된 양식에 손으로 작성한 문서를 사진으로 찍어 올리면, 내용을 텍스트로
+  인식해 검색 가능한 PDF와 표(엑셀용 CSV 등)로 만들어 주는 프로그램입니다.
+  모든 처리가 회사 PC 안에서 이루어지며 문서가 외부로 전송되지 않습니다.</p>
+  <nav class="toc">
+    <a href="#install">설치·실행</a><a href="#template">템플릿 만들기</a><a href="#scan">문서 인식</a>
+    <a href="#review">검수</a><a href="#output">결과 받기</a><a href="#trouble">문제 해결</a>
+  </nav>
+</header>
+
+<div class="flow">
+  <span>📷 사진 업로드</span><em>→</em><span>🤖 자동 인식</span><em>→</em>
+  <span>✏️ 검수·수정</span><em>→</em><span>📄 PDF·표 다운로드</span>
+</div>
+
+<h2 id="install"><span class="step">1</span>설치와 실행</h2>
+
+<h3>설치 위치 정하기 (먼저 읽어주세요)</h3>
+<p>이 프로그램은 <b>압축 푼 폴더 하나가 곧 설치 전체</b>인 포터블 방식입니다.
+실행하면 프로그램 옆에 인식 엔진(<code>engine\</code>, 약 6GB)과 작업 데이터(<code>data\</code> —
+템플릿·작업 기록·결과)가 함께 만들어집니다. 그래서 폴더 위치가 중요합니다.</p>
+<ul>
+  <li><b>디스크 여유가 8GB 이상</b>인 드라이브에 두세요 — 첫 실행 때 인식 엔진 약 6GB를
+      내려받고, 이후 작업 데이터도 계속 쌓이기 때문입니다.</li>
+  <li><b><code>C:\Program Files</code> 안에는 두지 마세요</b> — Windows가 그 안의 쓰기를
+      관리자 권한으로 제한하기 때문에, 일반 실행으로는 엔진 다운로드와 작업 저장이
+      실패합니다. <code>D:\handwrite-scanner</code>나 <code>C:\Users\이름\</code> 아래처럼
+      내가 자유롭게 쓸 수 있는 위치가 적합합니다.</li>
+  <li><b>이동·백업은 폴더째로</b> — 폴더를 통째로 복사하면 모델·템플릿·작업 기록까지 전부
+      따라가므로 다른 PC에서 재다운로드 없이 바로 쓸 수 있습니다. 반대로
+      <code>handwrite-scanner.exe</code>만 따로 복사하면 실행되지 않습니다
+      (<code>_internal\</code>에 프로그램 구성 요소가 들어 있습니다).</li>
+  <li><b>삭제 시 주의</b> — 폴더를 지우면 작업 기록도 함께 사라집니다. 기록을 남기려면
+      <code>data\</code> 폴더만 다른 곳에 복사해 두세요.</li>
+</ul>
+
+<h3>내 PC에서만 쓸 때</h3>
+<ol>
+  <li>배포 파일 <code>handwrite-scanner.zip</code>을 원하는 폴더에 풉니다. (별도 프로그램 설치 불필요)</li>
+  <li><code>handwrite-scanner.exe</code>를 실행합니다. 잠시 후 브라우저가 자동으로 열립니다.</li>
+  <li><b>첫 실행에만</b> 인식 엔진(약 6GB)을 자동으로 내려받습니다. 검은 창에 진행률이 표시되며,
+      완료까지 회선에 따라 수십 분 걸릴 수 있습니다. 두 번째 실행부터는 바로 켜집니다.</li>
+</ol>
+
+<h3>사무실에서 여럿이 쓸 때 (서버 방식)</h3>
+<ol>
+  <li>PC 한 대(램 16GB 권장)에만 위와 같이 설치하고, <code>server-mode.bat</code>을 실행합니다.</li>
+  <li>검은 창에 표시되는 주소(예: <code>http://192.168.0.10:8000</code>)를 다른 직원들에게 알려줍니다.
+      각자 브라우저 주소창에 입력하면 바로 사용할 수 있습니다.</li>
+  <li>처음 켤 때 Windows 방화벽 허용 창이 뜨면 <b>허용</b>을 누릅니다.</li>
+</ol>
+
+<div class="tip"><b>요구 사양</b>
+램 16GB 권장(8GB는 관리자에게 경량 모델 설정 요청), 디스크 여유 8GB 이상.
+GPU는 필요 없습니다. 프로그램을 끝내려면 검은 콘솔 창을 닫으면 됩니다.</div>
+
+<h2 id="template"><span class="step">2</span>템플릿 만들기 — 인식률의 핵심 <small style="font-weight:400;font-size:14px;color:var(--muted)">(양식마다 1회, 관리자)</small></h2>
+
+<p>템플릿은 "이 양식의 어느 위치에 어떤 종류의 값이 적히는지"를 알려주는 설정입니다.
+템플릿 없이도 인식은 되지만, 등록하면 정확도가 크게 올라갑니다. 자주 쓰는 양식일수록
+꼭 등록하세요.</p>
+
+<ol>
+  <li>상단 메뉴 <b>템플릿</b> → 이름 입력 → <b>빈 양식</b>(아무것도 안 적힌 원본)의 이미지나 PDF를
+      선택하고 <b>기준 양식 등록</b>.</li>
+  <li>화면에 뜬 양식 이미지 위에서 <b>마우스 드래그로 손글씨가 적힐 칸마다 박스</b>를 그립니다.
+      칸 테두리에 다소 걸쳐도 괜찮습니다.</li>
+  <li>아래 표에서 각 박스의 라벨(이름)과 타입을 지정하고 <b>저장</b>.</li>
+</ol>
+
+<div class="tablewrap"><table>
+  <tr><th>타입</th><th>어떤 칸에 쓰나</th><th>예시</th></tr>
+  <tr><td>자유텍스트</td><td>아무 내용이나 적히는 칸</td><td>사유, 비고</td></tr>
+  <tr><td>후보목록</td><td>정해진 값 중 하나가 적히는 칸. 후보를 줄바꿈으로 입력해 두면
+      가장 비슷한 것을 자동 선택</td><td>성명(직원 명단), 부서명</td></tr>
+  <tr><td>전화번호</td><td>전화번호 칸. 자릿수 검증과 형식 정리를 자동 수행</td><td>연락처</td></tr>
+  <tr><td>숫자</td><td>숫자만 적히는 칸. <b>범위(min~max)</b>를 지정하면 잘못 읽은 값을
+      자동으로 걸러냄</td><td>월차잔여수 (0~11)</td></tr>
+  <tr><td>표시 선택</td><td>인쇄된 선택지 중 하나에 동그라미·체크·빗금 등이 표시되는 칸.
+      선택지를 후보 목록에 입력</td><td>승인종류</td></tr>
+</table></div>
+
+<div class="tip"><b>인식률을 올리는 요령</b>
+후보목록과 숫자 범위를 최대한 채워 두세요. "적힐 수 있는 값"을 좁혀 줄수록 악필도 정확히
+읽어냅니다. 특수한 칸은 <b>추가 지시</b>란에 설명을 적어줄 수 있습니다
+(예: "인쇄된 20과 손글씨를 이어붙여 연도로 읽어라").</div>
+
+<h2 id="scan"><span class="step">3</span>문서 인식하기</h2>
+<ol>
+  <li><b>작업</b> 화면에서 문서 사진(여러 장 가능)을 선택하고, 해당 양식의 템플릿을 고른 뒤
+      <b>인식 시작</b>.</li>
+  <li>작업 목록에 진행률이 표시됩니다. 문서 1장에 수 분 정도 걸리므로,
+      <b>여러 장을 한 번에 걸어두고 다른 일을 하다가 나중에 검수</b>하는 방식을 권합니다.
+      퇴근 전에 걸어두면 다음날 아침 완료되어 있습니다.</li>
+  <li>같은 양식의 문서끼리 한 작업으로 올리세요. 한 작업의 모든 사진에 같은 템플릿이 적용되고,
+      PDF도 작업 단위로 한 파일이 됩니다.</li>
+</ol>
+<p>사진은 스캐너가 아니어도 됩니다. 휴대폰 사진도 문서가 화면에 꽉 차고 초점이 맞으면
+기울어짐은 자동으로 보정됩니다.</p>
+
+<h2 id="review"><span class="step">4</span>검수 — 색만 보면 됩니다</h2>
+<p>작업이 끝나면 <b>검수/다운로드</b>를 엽니다. 필드마다 원본 손글씨 조각과 인식된 텍스트가
+나란히 표시되고, 행 색깔이 확신도를 나타냅니다.</p>
+
+<div class="tablewrap"><table class="conf">
+  <tr><th>색</th><th>의미</th><th>할 일</th></tr>
+  <tr><td><span class="swatch" style="background:var(--good-bg);border:1px solid var(--good)"></span>초록 (100%)</td>
+      <td>후보와 정확히 일치</td><td>넘어가도 됨</td></tr>
+  <tr><td><span class="swatch" style="background:var(--warn1-bg);border:1px solid var(--warn1)"></span>노랑 (76~99%)</td>
+      <td>형식 검증 통과</td><td>훑어보기</td></tr>
+  <tr><td><span class="swatch" style="background:var(--warn2-bg);border:1px solid var(--warn2)"></span>주황 (51~75%)</td>
+      <td>확신 낮음 · 자동 보정됨</td><td><b>원본과 대조</b></td></tr>
+  <tr><td><span class="swatch" style="background:var(--bad-bg);border:1px solid var(--bad)"></span>빨강 (50% 이하)</td>
+      <td>인식 실패 가능성</td><td><b>반드시 확인</b></td></tr>
+</table></div>
+
+<p>값이 틀렸으면 입력란을 클릭해 고치면 됩니다. <b>고치는 즉시 저장</b>되고 해당 행은 초록으로
+바뀝니다. 브라우저를 닫았다 다시 열어도 수정 내용은 유지됩니다.</p>
+
+<h2 id="output"><span class="step">5</span>결과 받기</h2>
+<ul>
+  <li><b>미리보기</b> — 다운로드 없이 브라우저 탭에서 PDF를 바로 확인합니다.</li>
+  <li><b>PDF 다운로드 (원본+텍스트층)</b> — 보기엔 스캔본 그대로이면서, 안의 글자를
+      검색·복사할 수 있는 PDF입니다. 인식된 텍스트가 각 칸 아래 흐린 회색으로 표시됩니다.</li>
+  <li><b>표 내보내기</b> — 드롭다운에서 형식을 고르고 내려받습니다.
+    <ul>
+      <li><b>CSV</b> — 엑셀용. 같은 양식 여러 장이면 <b>문서 1장 = 1행</b>으로 나와 바로 집계 가능</li>
+      <li><b>Markdown / 텍스트</b> — 보고서·메일에 붙여넣기 좋은 표 형식</li>
+    </ul></li>
+</ul>
+
+<h2 id="trouble"><span class="step">6</span>문제 해결</h2>
+<div class="tablewrap"><table>
+  <tr><th>증상</th><th>원인과 해결</th></tr>
+  <tr><td>내려받은 PDF를 열 때 "위험할 수 있음" 경고</td>
+      <td>웹에서 받은 모든 파일에 붙는 Windows 표식으로, 파일에는 문제가 없습니다.
+      확인만 할 땐 <b>미리보기</b>를 쓰면 경고가 없습니다. 파일 우클릭 → 속성 → <b>차단 해제</b>로
+      없앨 수도 있습니다.</td></tr>
+  <tr><td>다른 PC에서 서버 주소로 접속이 안 됨</td>
+      <td>서버 PC에서 방화벽 허용을 안 했을 가능성. <code>server-mode.bat</code>을 다시 실행해
+      허용 창에서 <b>허용</b>을 누르세요.</td></tr>
+  <tr><td>검수 화면에 "정합 실패" 경고</td>
+      <td>사진이 심하게 비뚤거나 다른 양식일 때 표시됩니다. 결과를 꼼꼼히 확인하고,
+      가능하면 문서가 정면으로 나오게 다시 찍어 올리세요.</td></tr>
+  <tr><td>처리가 너무 느리거나 멈춤</td>
+      <td>정상적으로 1장에 수 분입니다. 콘솔 창에 오류가 보이거나 램 부족이면
+      관리자에게 경량(3B) 모델 설정을 요청하세요.</td></tr>
+  <tr><td>작업 기록을 백업하고 싶음</td>
+      <td>프로그램 폴더의 <span class="path">data\</span> 폴더에 템플릿과 모든 작업
+      (원본·결과·PDF)이 저장됩니다. 이 폴더만 복사하면 전체 백업이 됩니다.</td></tr>
+</table></div>
+
+<footer class="doc">handwrite-scanner — 문서는 PC/사내망 밖으로 전송되지 않습니다 · 문의는 관리자에게</footer>
+</div>
