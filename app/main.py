@@ -73,6 +73,8 @@ def models_download(model_id: str):
 @app.post("/api/models/{model_id}/select")
 def models_select(model_id: str):
     from app import models
+    if any(s["state"] in ("running", "queued") for s in jobs.list_jobs()):
+        raise HTTPException(409, "인식 작업이 진행 중입니다. 완료 후 모델을 바꾸세요.")
     try:
         e = models.select(model_id)
     except ValueError as ex:
