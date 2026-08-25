@@ -167,23 +167,25 @@ def jobs_list():
 
 @app.get("/api/jobs/{job_id}")
 def job_get(job_id: str):
-    st = jobs.status(_safe(job_id))
+    safe_id = _safe(job_id)
+    st = jobs.status(safe_id)
     if not st:
         return JSONResponse({"error": "not found"}, status_code=404)
-    return {"status": st, "results": jobs.results(job_id)}
+    return {"status": st, "results": jobs.results(safe_id)}
 
 
 @app.patch("/api/jobs/{job_id}/fields")
 async def job_field_update(job_id: str, body: dict):
     """검수 수정: {page, id, value}. 후보 타입인데 목록에 없는 값이면 학습 제안."""
-    res = jobs.results(_safe(job_id))
+    safe_id = _safe(job_id)
+    res = jobs.results(safe_id)
     page = res[body["page"]]
     suggest = None
     for f in page["fields"]:
         if f["id"] == body["id"]:
             f["value"] = body["value"]
             f["confidence"] = 1.0
-            tpl_name = page.get("template") or (jobs.status(job_id) or {}).get("template")
+            tpl_name = page.get("template") or (jobs.status(safe_id) or {}).get("template")
             if (tpl_name and f.get("type") in ("candidates", "circle")
                     and body["value"].strip()):
                 tpl = templates_store.get(tpl_name)
@@ -192,7 +194,7 @@ async def job_field_update(job_id: str, body: dict):
                 if tf is not None and body["value"] not in tf.get("candidates", []):
                     suggest = {"template": tpl_name, "field_id": f["id"],
                                "value": body["value"]}
-    jobs.write_results(job_id, res)
+    jobs.write_results(safe_id, res)
     return {"ok": True, "suggest": suggest}
 
 
