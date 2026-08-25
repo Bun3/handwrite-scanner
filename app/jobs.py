@@ -11,11 +11,21 @@ def create(template: str | None, files: list[tuple[str, bytes]]) -> str:
     d = JOBS_DIR / job_id
     (d / "input").mkdir(parents=True)
     (d / "output").mkdir()
-    for i, (name, data) in enumerate(files):
+    page = 0
+    for name, data in files:
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else "png"
+        if ext == "pdf" or data[:5] == b"%PDF-":
+            # 복합기 스캔 PDF: 페이지별 이미지로 분해 (전 양식 1장짜리 전제)
+            import pymupdf
+            doc = pymupdf.open(stream=data, filetype="pdf")
+            for pg in doc:
+                pg.get_pixmap(dpi=300).save(d / "input" / f"{page:03d}.png")
+                page += 1
+            continue
         if not ext.isalnum() or len(ext) > 5:
             ext = "png"
-        (d / "input" / f"{i:03d}.{ext}").write_bytes(data)
+        (d / "input" / f"{page:03d}.{ext}").write_bytes(data)
+        page += 1
     write_status(job_id, {"id": job_id, "template": template, "state": "queued",
                           "progress": "", "created": time.strftime("%Y-%m-%d %H:%M:%S")})
     return job_id
