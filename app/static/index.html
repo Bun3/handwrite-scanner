@@ -57,6 +57,11 @@
   <button class="secondary" onclick="mergedExport()">내려받기</button>
 </div>
 <div class="card">
+  <h3>인식 모델 <span id="ramInfo" class="hint" style="font-weight:400"></span></h3>
+  <table id="mdl"><tr><th>모델</th><th>크기</th><th>최소 RAM</th><th>상태</th><th></th></tr></table>
+  <p class="hint">⭐ = 이 PC 사양(RAM) 기준 추천. 모델을 바꾸면 다음 인식부터 적용됩니다.</p>
+</div>
+<div class="card">
   <h3>작업 목록</h3>
   <table id="jobs"><tr><th>ID</th><th>템플릿</th><th>상태</th><th>진행</th><th></th></tr></table>
 </div>
@@ -127,6 +132,43 @@ async function health() {
   document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 로딩 중(첫 작업 시 자동 기동)';
 }
 
+let mdlTimer = null;
+async function loadModels() {
+  const d = await j('/api/models');
+  document.getElementById('ramInfo').textContent = `— 이 PC RAM: ${d.ram_gb}GB`;
+  const tb = document.getElementById('mdl');
+  tb.innerHTML = '<tr><th>모델</th><th>크기</th><th>최소 RAM</th><th>상태</th><th></th></tr>';
+  let anyDownloading = false;
+  for (const m of d.models) {
+    anyDownloading ||= m.downloading;
+    const state = m.error ? `<span class="badge error">실패</span>`
+      : m.downloading ? `<span class="badge running">다운로드 ${m.progress}%</span>`
+      : m.active ? `<span class="badge done">사용 중</span>`
+      : m.installed ? '설치됨' : '<span class="hint">미설치</span>';
+    const act = m.active ? ''
+      : m.installed ? `<button style="padding:3px 10px;font-size:12px" onclick="mdlSelect('${m.id}')">사용</button>`
+      : m.downloading ? ''
+      : `<button class="secondary" style="padding:3px 10px;font-size:12px" onclick="mdlDownload('${m.id}')">다운로드</button>`;
+    tb.insertRow().innerHTML = `<td>${esc(m.label)}${m.recommended ? ' ⭐' : ''}<br>
+        <span class="hint">${esc(m.desc)}</span></td>
+      <td>${m.size_gb}GB</td><td>${m.min_ram_gb}GB</td>
+      <td>${state}${m.error ? `<br><span class="hint">${esc(m.error)}</span>` : ''}</td><td>${act}</td>`;
+  }
+  clearTimeout(mdlTimer);
+  if (anyDownloading) mdlTimer = setTimeout(loadModels, 3000);
+}
+
+async function mdlDownload(id) {
+  await fetch(`/api/models/${id}/download`, { method: 'POST' });
+  loadModels();
+}
+
+async function mdlSelect(id) {
+  const r = await fetch(`/api/models/${id}/select`, { method: 'POST' });
+  if (!r.ok) alert((await r.json()).detail || '변경 실패');
+  loadModels();
+}
+
 async function delJob(id) {
   if (!confirm(`작업 ${id} 을(를) 삭제할까요? 인식 결과·PDF가 함께 삭제됩니다.`)) return;
   const r = await fetch('/api/jobs/' + encodeURIComponent(id), { method: 'DELETE' });
@@ -155,7 +197,7 @@ async function updateCheck() {
   }
 }
 
-loadTpl(); refresh(); health(); setInterval(refresh, 3000);
+loadTpl(); refresh(); health(); loadModels(); setInterval(refresh, 3000);
 setTimeout(updateCheck, 3000);
 </script>
 </body>

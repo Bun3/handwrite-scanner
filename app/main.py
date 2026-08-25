@@ -53,6 +53,33 @@ def update_info():
     return _update
 
 
+# ---------- 인식 모델 ----------
+
+@app.get("/api/models")
+def models_list():
+    from app import models
+    return models.status_list()
+
+
+@app.post("/api/models/{model_id}/download")
+def models_download(model_id: str):
+    from app import models
+    if not models.entry(model_id):
+        raise HTTPException(404, "알 수 없는 모델")
+    models.start_download(model_id)
+    return {"ok": True}
+
+
+@app.post("/api/models/{model_id}/select")
+def models_select(model_id: str):
+    from app import models
+    try:
+        e = models.select(model_id)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    return {"ok": True, "label": e["label"]}
+
+
 # ---------- 폰 업로드 ----------
 
 @app.post("/api/phone/start")

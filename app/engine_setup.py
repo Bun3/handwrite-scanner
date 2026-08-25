@@ -10,7 +10,6 @@ import zipfile
 from app import config
 
 LLAMA_ZIP = "https://github.com/ggml-org/llama.cpp/releases/download/b10549/llama-b10549-bin-win-cpu-x64.zip"
-HF = "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/"
 
 
 def _download(url: str, dest, label: str) -> None:
@@ -54,13 +53,16 @@ def ensure_engine() -> None:
         with zipfile.ZipFile(zip_path) as z:
             z.extractall(config.ENGINE_DIR / "llama")
         zip_path.unlink()
-    for path in (config.MODEL, config.MMPROJ):
+    from app import models
+    e = models.current()  # 설정된 모델, 없으면 시스템 RAM 기준 추천 모델
+    for path, fname in zip(models.paths(e), (e["model"], e["mmproj"])):
         if not path.exists():
-            print(f"모델 다운로드 중: {path.name} (수 GB — 아래 진행률 참고. "
+            print(f"모델 다운로드 중: {fname} — {e['label']} (수 GB, 아래 진행률 참고. "
                   "중간에 꺼져도 재실행하면 이어받습니다)", flush=True)
             path.parent.mkdir(parents=True, exist_ok=True)
-            _download(HF + path.name, path, path.name)
-    print("엔진 준비 완료.", flush=True)
+            _download(f"https://huggingface.co/{e['repo']}/resolve/main/{fname}",
+                      path, fname)
+    print(f"엔진 준비 완료. (모델: {e['label']})", flush=True)
 
 
 def free_disk_ok() -> bool:

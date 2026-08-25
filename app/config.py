@@ -12,8 +12,7 @@ else:
     STATIC_DIR = BASE_DIR / "app" / "static"
 ENGINE_DIR = BASE_DIR / "engine"
 LLAMA_SERVER = ENGINE_DIR / "llama" / "llama-server.exe"
-MODEL = ENGINE_DIR / "models" / "Qwen3VL-8B-Instruct-Q4_K_M.gguf"
-MMPROJ = ENGINE_DIR / "models" / "mmproj-Qwen3VL-8B-Instruct-F16.gguf"
+# 인식 모델은 app/models.py 카탈로그에서 선택 (data/settings.json 에 저장)
 LLAMA_PORT = 18080
 APP_PORT = 8000
 

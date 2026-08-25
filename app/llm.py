@@ -19,13 +19,15 @@ def is_up() -> bool:
 
 
 def ensure_server(timeout: int = 300) -> None:
-    """llama-server가 없으면 subprocess로 띄우고 로드 완료까지 대기."""
+    """llama-server가 없으면 선택된 모델로 띄우고 로드 완료까지 대기."""
     global _proc
     if is_up():
         return
+    from app import models
+    model, mmproj = models.paths(models.current())
     _proc = subprocess.Popen(
-        [str(config.LLAMA_SERVER), "-m", str(config.MODEL),
-         "--mmproj", str(config.MMPROJ), "--port", str(config.LLAMA_PORT),
+        [str(config.LLAMA_SERVER), "-m", str(model),
+         "--mmproj", str(mmproj), "--port", str(config.LLAMA_PORT),
          "--host", "127.0.0.1", "-c", "8192"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     deadline = time.time() + timeout
@@ -35,9 +37,20 @@ def ensure_server(timeout: int = 300) -> None:
         if _proc.poll() is not None:
             raise RuntimeError(
                 f"llama-server 종료됨 (exit {_proc.returncode}). "
-                "메모리 부족이면 config.MODEL을 3B 모델로 교체하세요.")
+                "메모리 부족이면 설정에서 더 작은 모델을 선택하세요.")
         time.sleep(2)
     raise RuntimeError("llama-server 기동 시간 초과")
+
+
+def restart() -> None:
+    """모델 교체 등으로 llama-server 재기동이 필요할 때. 다음 호출 시 새로 뜬다."""
+    global _proc
+    if _proc is not None and _proc.poll() is None:
+        _proc.kill()
+    else:  # 다른 프로세스(이전 실행)가 띄운 서버까지 정리
+        subprocess.run(["taskkill", "/IM", "llama-server.exe", "/F"],
+                       capture_output=True)
+    _proc = None
 
 
 def ask_image(image_bytes: bytes, prompt: str, timeout: float = 600) -> str:
