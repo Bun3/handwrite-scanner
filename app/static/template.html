@@ -131,9 +131,18 @@ function renderFields() {
             onchange="fields[${i}].min=this.value===''?undefined:+this.value">~
           <input type="number" style="width:60px" value="${f.max ?? ''}" placeholder="max"
             onchange="fields[${i}].max=this.value===''?undefined:+this.value"></div>` : ''}</td>
-      <td><button class="danger" onclick="fields.splice(${i},1);renderFields();draw()">삭제</button></td>`;
+      <td style="white-space:nowrap"><button class="secondary" title="위로" ${i === 0 ? 'disabled' : ''}
+          onclick="moveField(${i},-1)">↑</button><button class="secondary" title="아래로"
+          ${i === fields.length - 1 ? 'disabled' : ''} onclick="moveField(${i},1)">↓</button>
+        <button class="danger" onclick="fields.splice(${i},1);renderFields()">삭제</button></td>`;
   });
   draw();
+}
+
+function moveField(i, d) {
+  // 필드 순서 = 검수 표시 순서 = 내보내기 컬럼 순서
+  [fields[i], fields[i + d]] = [fields[i + d], fields[i]];
+  renderFields();
 }
 
 async function autoDetect() {
