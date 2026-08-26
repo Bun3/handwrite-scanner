@@ -114,12 +114,15 @@ cv.onmouseup = () => {
 
 const TYPES = { text: '자유텍스트', candidates: '후보목록', phone: '전화번호', number: '숫자', circle: '표시 선택(동그라미·체크 등)' };
 
+let dragIdx = null;  // 행 드래그로 순서 변경 (순서 = 검수 표시·내보내기 컬럼 순서)
+
 function renderFields() {
   const tb = document.getElementById('fields');
-  tb.innerHTML = '<tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr>';
+  tb.innerHTML = '<tr><th></th><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr>';
   fields.forEach((f, i) => {
     const tr = tb.insertRow();
-    tr.innerHTML = `<td><input value="${esc(f.label)}" onchange="fields[${i}].label=this.value;draw()"></td>
+    tr.innerHTML = `<td class="grab" title="드래그로 순서 변경" style="cursor:grab;color:#999">⠿</td>
+      <td><input value="${esc(f.label)}" onchange="fields[${i}].label=this.value;draw()"></td>
       <td><select onchange="fields[${i}].type=this.value;renderFields()">${Object.entries(TYPES).map(([k, v]) =>
         `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
       <td><textarea rows="1" style="width:100%" placeholder="후보목록/동그라미 타입만"
@@ -131,18 +134,21 @@ function renderFields() {
             onchange="fields[${i}].min=this.value===''?undefined:+this.value">~
           <input type="number" style="width:60px" value="${f.max ?? ''}" placeholder="max"
             onchange="fields[${i}].max=this.value===''?undefined:+this.value"></div>` : ''}</td>
-      <td style="white-space:nowrap"><button class="secondary" title="위로" ${i === 0 ? 'disabled' : ''}
-          onclick="moveField(${i},-1)">↑</button><button class="secondary" title="아래로"
-          ${i === fields.length - 1 ? 'disabled' : ''} onclick="moveField(${i},1)">↓</button>
-        <button class="danger" onclick="fields.splice(${i},1);renderFields()">삭제</button></td>`;
+      <td><button class="danger" onclick="fields.splice(${i},1);renderFields()">삭제</button></td>`;
+    tr.querySelector('.grab').onmousedown = () => tr.draggable = true;
+    tr.ondragstart = e => { dragIdx = i; e.dataTransfer.effectAllowed = 'move'; };
+    tr.ondragend = () => { tr.draggable = false; dragIdx = null; };
+    tr.ondragover = e => { e.preventDefault(); tr.style.outline = '2px solid #2c7be5'; };
+    tr.ondragleave = () => tr.style.outline = '';
+    tr.ondrop = e => {
+      e.preventDefault();
+      if (dragIdx === null || dragIdx === i) { tr.style.outline = ''; return; }
+      const [m] = fields.splice(dragIdx, 1);
+      fields.splice(i, 0, m);
+      renderFields();
+    };
   });
   draw();
-}
-
-function moveField(i, d) {
-  // 필드 순서 = 검수 표시 순서 = 내보내기 컬럼 순서
-  [fields[i], fields[i + d]] = [fields[i + d], fields[i]];
-  renderFields();
 }
 
 async function autoDetect() {
