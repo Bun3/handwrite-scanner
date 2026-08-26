@@ -219,8 +219,12 @@ def _prompt(f: dict) -> str:
 
 def _post(raw: str, f: dict) -> tuple[str, float]:
     if f["type"] == "circle" or (f.get("candidates") and f["type"] != "text_free"):
-        return postprocess.match_candidate(raw, f.get("candidates") or [])
-    return postprocess.validate(raw, f["type"])
+        value, conf = postprocess.match_candidate(raw, f.get("candidates") or [])
+    else:
+        value, conf = postprocess.validate(raw, f["type"])
+    if not value and f.get("optional"):
+        conf = 0.9  # 비어있어도 정상인 필드 — 빈칸을 빨간색으로 만들지 않는다
+    return value, conf
 
 
 def _second_pass(crop_png: bytes, f: dict, value: str, conf: float):

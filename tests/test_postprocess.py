@@ -54,6 +54,14 @@ def test_empty_answer_not_forced():
     assert validate("없음", "phone") == ("", 0.3)
 
 
+def test_optional_field_empty_is_calm():
+    """'비어있어도 정상' 필드는 빈 값이 빨간색(0.3)이 아니라 0.9."""
+    from app.worker import _post
+    assert _post("없음", {"type": "number", "optional": True}) == ("", 0.9)
+    assert _post("없음", {"type": "number"}) == ("", 0.3)
+    assert _post("5", {"type": "number", "optional": True}) == ("5", 0.9)  # 값 있으면 평소대로
+
+
 def test_export_formats():
     from app.export import build
     res = [{"fields": [{"label": "성명", "value": "홍길동"},

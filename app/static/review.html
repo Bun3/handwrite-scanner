@@ -13,6 +13,9 @@
 <main>
 <div class="card">
   <h3 id="title">검수</h3>
+  <select id="fieldFilter" onchange="applyFilter()" style="margin-bottom:10px">
+    <option value="">(모든 필드)</option>
+  </select> <span class="hint">필드 하나만 골라 전 페이지를 모아서 검수할 수 있습니다</span>
   <div id="alignWarn" class="warn" style="display:none">
     ⚠ 템플릿 정합에 실패해 단순 크기 맞춤으로 처리했습니다. 결과를 꼼꼼히 확인하세요.
   </div>
@@ -64,6 +67,8 @@ async function load() {
     for (const f of page.fields) {
       const row = document.createElement('div');
       row.className = 'field-row ' + confClass(f.confidence);
+      row.dataset.label = f.label;
+      addFilterOption(f.label);
       const label = document.createElement('div');
       label.className = 'label';
       label.textContent = f.label + (f.confidence < 0.7 ? ' ⚠' : '');
@@ -110,6 +115,20 @@ async function load() {
       list.appendChild(row);
     }
   }
+}
+
+function addFilterOption(label) {
+  const sel = document.getElementById('fieldFilter');
+  if (![...sel.options].some(o => o.value === label)) sel.add(new Option(label, label));
+}
+
+function applyFilter() {
+  const v = document.getElementById('fieldFilter').value;
+  document.querySelectorAll('.field-row').forEach(r =>
+    r.style.display = (!v || r.dataset.label === v) ? '' : 'none');
+  document.querySelectorAll('.warn').forEach(w => {  // 필터 중엔 페이지 경고 숨김
+    if (w.id !== 'alignWarn') w.style.display = v ? 'none' : '';
+  });
 }
 
 function confClass(c) {

@@ -125,7 +125,9 @@ function renderFields() {
     tr.innerHTML = `<td class="grab" title="드래그로 순서 변경" style="cursor:grab;color:#999">⠿</td>
       <td><input value="${esc(f.label)}" onchange="fields[${i}].label=this.value;draw()"></td>
       <td><select onchange="fields[${i}].type=this.value;renderFields()">${Object.entries(TYPES).map(([k, v]) =>
-        `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+        `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select><br>
+        <label class="hint" style="white-space:nowrap"><input type="checkbox" ${f.optional ? 'checked' : ''}
+          onchange="fields[${i}].optional=this.checked"> 비어있어도 정상</label></td>
       <td><textarea rows="1" style="width:100%" placeholder="후보목록/동그라미 타입만"
         onchange="fields[${i}].candidates=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc((f.candidates || []).join('\n'))}</textarea></td>
       <td><textarea rows="1" style="width:100%" placeholder="모델에게 줄 추가 설명"
