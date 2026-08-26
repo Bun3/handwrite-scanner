@@ -26,7 +26,8 @@
     <button class="secondary" id="adBtn" onclick="autoDetect()" style="font-size:13px">✨ 자동 필드 감지 (베타)</button>
   </h3>
   <table id="fields"><tr><th>라벨</th><th>타입</th><th>후보 목록 (줄바꿈 구분)</th><th>추가 지시(선택)</th><th></th></tr></table>
-  <h3>검증 규칙 <span class="hint" style="font-weight:400">(선택 — 줄바꿈 구분, 필드 id를 변수로 쓰는 산술·비교식. 예: <code>pre - post >= 0</code>)</span></h3>
+  <h3>검증 규칙 <span class="hint" style="font-weight:400">(선택 — 줄바꿈 구분, 필드 id를 변수로 쓰는 산술·비교식. 예: <code>pre - post >= 0</code>.
+    <code>필드id = 식</code> 형태는 빈 값을 식으로 채우고, 값이 있으면 등식을 검증합니다)</span></h3>
   <textarea id="rules" rows="2" style="width:100%" placeholder="위반 시 관련 필드가 검수에서 강조됩니다"></textarea>
   <br><br><button onclick="saveTpl()">저장</button> <span id="saved" class="hint"></span>
 </div>
