@@ -143,13 +143,40 @@ def _recognize_fields(job_id, st, tpl, aligned, page_no, total_pages, job_dir):
 
 
 def _apply_rules(tpl: dict, fields: list) -> list[str]:
-    """교차 필드 검증. 위반 규칙의 관련 필드는 신뢰도를 낮춰 검수 강조."""
+    """교차 필드 검증·유추. 위반 규칙의 관련 필드는 신뢰도를 낮춰 검수 강조.
+
+    "fid = 식" 유추 규칙: 대상이 비어 있으면 식의 값으로 채우고(신뢰도 0.75),
+    값이 있으면 등식 검증. 유추값이 필드 min/max를 벗어나면 채우지 않는다
+    (예: 종일 휴가의 근무시간 차를 '총 시간'에 넣는 오류 방지).
+    """
     from app import rules as rules_mod
     warnings = []
     values = {f["id"]: f["value"] for f in fields}
+    by_id = {f["id"]: f for f in fields}
     for expr in tpl.get("rules", []):
         try:
-            if rules_mod.check(expr, values) is False:
+            violated = False
+            assign = rules_mod.parse_assign(expr)
+            if assign:
+                tid, rhs = assign
+                target = by_id.get(tid)
+                val = rules_mod.evaluate(rhs, values)
+                if target is None or val is None:
+                    continue
+                cur = str(target["value"]).strip()
+                if cur.lstrip("-").isdigit():
+                    violated = int(cur) != val
+                else:
+                    fdef = next((x for x in tpl["fields"] if x["id"] == tid), {})
+                    if fdef.get("min", val) <= val <= fdef.get("max", val):
+                        target["value"] = str(val)
+                        target["confidence"] = 0.75  # 유추값 — 검수 훑어보기 선
+                        values[tid] = target["value"]
+                        warnings.append(f"빈 값 유추: {target['label']} = {val}")
+                    continue
+            else:
+                violated = rules_mod.check(expr, values) is False
+            if violated:
                 warnings.append(f"검증 실패: {expr}")
                 for f in fields:
                     if f["id"] in rules_mod.rule_ids(expr):
