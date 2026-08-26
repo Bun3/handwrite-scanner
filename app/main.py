@@ -257,6 +257,24 @@ def job_cancel(job_id: str):
     raise HTTPException(409, "이미 종료된 작업입니다")
 
 
+@app.post("/api/jobs/{job_id}/rerun")
+def job_rerun(job_id: str):
+    """저장된 원본으로 처음부터 재인식 (템플릿·규칙 변경 후 다시 돌릴 때).
+
+    같은 작업 id를 재사용하고 결과를 새로 쓴다 — 이전 결과가 필요하면 먼저 내보내기.
+    """
+    safe_id = _safe(job_id)
+    st = jobs.status(safe_id)
+    if not st:
+        raise HTTPException(404, "작업 없음")
+    if st["state"] in ("queued", "running"):
+        raise HTTPException(409, "진행 중인 작업입니다")
+    st.update(state="queued", progress="", error=None)
+    jobs.write_status(safe_id, st)
+    worker.enqueue(safe_id)
+    return {"ok": True}
+
+
 @app.delete("/api/jobs/{job_id}")
 def job_delete(job_id: str):
     safe_id = _safe(job_id)

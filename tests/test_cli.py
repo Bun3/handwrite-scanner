@@ -39,6 +39,9 @@ def test_submit_wait_export_delete(tmp_path, capsys):
     out = tmp_path / "out.csv"
     saved = run(capsys, "jobs", "export", job_id, "--fmt", "csv", "-o", str(out))
     assert out.exists() and saved["bytes"] > 0
+    run(capsys, "jobs", "rerun", job_id)              # 저장된 원본으로 재인식
+    d = run(capsys, "jobs", "wait", job_id, "--timeout", "120")
+    assert d["status"]["state"] == "done" and d["results"][0].get("skipped") is True
     run(capsys, "jobs", "delete", job_id)
 
 

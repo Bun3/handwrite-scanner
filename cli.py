@@ -103,6 +103,7 @@ def cmd_jobs_wait(c, a):
         _die("작업 id 또는 --all 이 필요합니다")
     _out(_wait(c, a.id, a.timeout))
 def cmd_jobs_cancel(c, a): _out(_req(c, "POST", f"/api/jobs/{a.id}/cancel").json())
+def cmd_jobs_rerun(c, a): _out(_req(c, "POST", f"/api/jobs/{a.id}/rerun").json())
 def cmd_jobs_delete(c, a): _out(_req(c, "DELETE", f"/api/jobs/{a.id}").json())
 
 
@@ -200,6 +201,7 @@ def _build_parser() -> argparse.ArgumentParser:
     jobs.add_parser("list", help="작업 목록").set_defaults(fn=cmd_jobs_list)
     for name, fn, help_ in (("get", cmd_jobs_get, "상태+인식 결과"),
                             ("cancel", cmd_jobs_cancel, "작업 중단"),
+                            ("rerun", cmd_jobs_rerun, "저장된 원본으로 재인식"),
                             ("delete", cmd_jobs_delete, "작업 삭제")):
         s = jobs.add_parser(name, help=help_)
         s.add_argument("id")
