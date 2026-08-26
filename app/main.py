@@ -117,9 +117,10 @@ async def template_create(name: str = Form(...), file: UploadFile = None):
 async def template_update(name: str, body: dict):
     rules = body.get("rules")
     if rules:
-        from app.rules import validate_expr
+        from app.rules import resolve, validate_expr
+        label_ids = {f["label"]: f["id"] for f in body["fields"]}
         for expr in rules:
-            err = validate_expr(expr)
+            err = validate_expr(resolve(expr, label_ids))
             if err:
                 raise HTTPException(400, f"규칙 오류 '{expr}': {err}")
     for f in body["fields"]:

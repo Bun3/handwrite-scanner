@@ -35,6 +35,16 @@ def _eval(node, vars_):
     raise ValueError(f"허용되지 않는 식: {ast.dump(node)[:60]}")
 
 
+def resolve(expr: str, label_ids: dict[str, str]) -> str:
+    """규칙에 쓴 필드 라벨을 필드 id로 치환. 긴 라벨 우선 — 부분 문자열 오치환 방지.
+
+    ponytail: 단순 문자열 치환 — 라벨이 연산자·숫자와 겹치는 극단 케이스는 미방어.
+    """
+    for label in sorted(label_ids, key=len, reverse=True):
+        expr = expr.replace(label, label_ids[label])
+    return expr
+
+
 def parse_assign(expr: str) -> tuple[str, str] | None:
     """'fid = 식' 형태면 (대상 fid, 우변 식 문자열) 반환, 아니면 None."""
     try:

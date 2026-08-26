@@ -30,6 +30,25 @@ def test_no_eval_escape():
         check("(lambda: 1)()", {})
 
 
+def test_resolve_labels():
+    from app.rules import resolve
+    ids = {"총 시간": "f1", "시작시간": "f2", "종료시간": "f3", "시작": "f4"}
+    assert resolve("총 시간 = 종료시간 - 시작시간", ids) == "f1 = f3 - f2"
+    assert resolve("시작 >= 0", ids) == "f4 >= 0"       # 긴 라벨 우선 치환
+    assert resolve("f9 >= 0", ids) == "f9 >= 0"          # id 직접 사용도 유지
+
+
+def test_apply_rules_label_syntax():
+    from app.worker import _apply_rules
+    tpl = {"fields": [{"id": "a1", "label": "시작"}, {"id": "b2", "label": "종료"}],
+           "rules": ["종료 >= 시작"]}
+    f = [{"id": "a1", "label": "시작", "value": "5", "confidence": 0.9},
+         {"id": "b2", "label": "종료", "value": "3", "confidence": 0.9}]
+    w = _apply_rules(tpl, f)
+    assert any("검증 실패" in x for x in w)
+    assert f[0]["confidence"] == 0.5 and f[1]["confidence"] == 0.5
+
+
 def test_assign_rule():
     assert parse_assign("total = end - start") == ("total", "end - start")
     assert parse_assign("end - start >= 0") is None

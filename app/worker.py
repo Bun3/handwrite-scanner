@@ -153,10 +153,12 @@ def _apply_rules(tpl: dict, fields: list) -> list[str]:
     warnings = []
     values = {f["id"]: f["value"] for f in fields}
     by_id = {f["id"]: f for f in fields}
+    label_ids = {f["label"]: f["id"] for f in tpl["fields"] if f.get("label")}
     for expr in tpl.get("rules", []):
         try:
             violated = False
-            assign = rules_mod.parse_assign(expr)
+            resolved = rules_mod.resolve(expr, label_ids)  # 라벨로 쓴 규칙 → id
+            assign = rules_mod.parse_assign(resolved)
             if assign:
                 tid, rhs = assign
                 target = by_id.get(tid)
@@ -175,11 +177,11 @@ def _apply_rules(tpl: dict, fields: list) -> list[str]:
                         warnings.append(f"빈 값 유추: {target['label']} = {val}")
                     continue
             else:
-                violated = rules_mod.check(expr, values) is False
+                violated = rules_mod.check(resolved, values) is False
             if violated:
                 warnings.append(f"검증 실패: {expr}")
                 for f in fields:
-                    if f["id"] in rules_mod.rule_ids(expr):
+                    if f["id"] in rules_mod.rule_ids(resolved):
                         f["confidence"] = min(f["confidence"], 0.5)
         except (SyntaxError, ValueError):
             warnings.append(f"규칙 오류: {expr}")
