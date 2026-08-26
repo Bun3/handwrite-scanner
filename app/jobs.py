@@ -33,7 +33,10 @@ def create(template: str | None, files: list[tuple[str, bytes]]) -> str:
 
 def _read(job_id: str, name: str):
     f = JOBS_DIR / job_id / name
-    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return None  # 크래시로 쓰다 만 파일(NUL 등) — 없는 것으로 취급, 서버는 계속 뜬다
 
 
 def status(job_id: str) -> dict | None:
@@ -44,14 +47,21 @@ def results(job_id: str) -> list | None:
     return _read(job_id, "results.json")
 
 
+def _write_atomic(job_id: str, name: str, text: str) -> None:
+    # 크래시 순간 쓰다 만 파일이 남지 않게 임시 파일 → 교체
+    f = JOBS_DIR / job_id / name
+    tmp = f.with_name(name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(f)
+
+
 def write_status(job_id: str, st: dict) -> None:
-    (JOBS_DIR / job_id / "status.json").write_text(
-        json.dumps(st, ensure_ascii=False), encoding="utf-8")
+    _write_atomic(job_id, "status.json", json.dumps(st, ensure_ascii=False))
 
 
 def write_results(job_id: str, res: list) -> None:
-    (JOBS_DIR / job_id / "results.json").write_text(
-        json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_atomic(job_id, "results.json",
+                  json.dumps(res, ensure_ascii=False, indent=2))
 
 
 def list_jobs() -> list[dict]:
