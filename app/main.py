@@ -269,6 +269,8 @@ def job_rerun(job_id: str):
         raise HTTPException(404, "작업 없음")
     if st["state"] in ("queued", "running"):
         raise HTTPException(409, "진행 중인 작업입니다")
+    # 재인식은 처음부터 — 이전 결과를 지워 크래시-이어가기 로직이 발동하지 않게
+    (jobs.JOBS_DIR / safe_id / "results.json").unlink(missing_ok=True)
     st.update(state="queued", progress="", error=None)
     jobs.write_status(safe_id, st)
     worker.enqueue(safe_id)

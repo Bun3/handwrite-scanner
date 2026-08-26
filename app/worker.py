@@ -75,9 +75,14 @@ def _process(job_id: str, st: dict) -> None:
         detect_pool = [(t, templates_store.reference_path(t["name"]))
                        for t in templates_store.list_templates()]
     images = jobs.input_images(job_id)
-    results = []
+    # 크래시 복구: 이전 실행이 완료한 페이지 프리픽스는 건너뛰고 이어간다.
+    # (재인식 버튼은 results.json을 지우고 시작하므로 항상 처음부터)
+    done = jobs.results(job_id) or []
+    results = done if all(p.get("page") == i for i, p in enumerate(done)) else []
     job_dir = jobs.JOBS_DIR / job_id
     for page_no, img_path in enumerate(images):
+        if page_no < len(results):
+            continue
         _check_cancel(job_id)
         data = img_path.read_bytes()
         tpl, aligned, ok = tpl_fixed, None, None
