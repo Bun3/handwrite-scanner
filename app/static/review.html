@@ -62,6 +62,7 @@ async function load() {
       const div = document.createElement('div');
       div.className = 'warn';
       div.textContent = '⚠ ' + w;
+      if (filterValue()) div.style.display = 'none';  // 로딩 중 필터가 걸려 있어도 준수
       list.appendChild(div);
     }
     for (const f of page.fields) {
@@ -69,6 +70,7 @@ async function load() {
       row.className = 'field-row ' + confClass(f.confidence);
       row.dataset.label = f.label;
       addFilterOption(f.label);
+      if (filterValue() && f.label !== filterValue()) row.style.display = 'none';
       const label = document.createElement('div');
       label.className = 'label';
       label.textContent = f.label + (f.confidence < 0.7 ? ' ⚠' : '');
@@ -116,6 +118,8 @@ async function load() {
     }
   }
 }
+
+const filterValue = () => document.getElementById('fieldFilter').value;
 
 function addFilterOption(label) {
   const sel = document.getElementById('fieldFilter');
