@@ -59,6 +59,15 @@ def validate(text: str, field_type: str) -> tuple[str, float]:
     if field_type == "number":
         digits = re.sub(r"\D", "", t.translate(_DIGIT_FIX))
         return (digits, 0.9) if digits else (t, 0.3)
+    if field_type == "time":
+        # "9" / "09:00" / "9.30" / "18시" 등 → 정시는 시(정수)만, 아니면 H:MM.
+        # 정시를 정수로 두는 이유: 규칙 엔진(정수 산술)이 그대로 동작한다.
+        m = re.search(r"(\d{1,2})\s*[:.시]?\s*(\d{2})?", t.translate(_DIGIT_FIX))
+        if m:
+            hour, minute = int(m.group(1)), int(m.group(2) or 0)
+            if hour <= 24 and minute < 60:
+                return (str(hour), 0.9) if minute == 0 else (f"{hour}:{minute:02d}", 0.9)
+        return t, 0.3
     return t, 0.7  # text 등: 형식 검증 없음
 
 

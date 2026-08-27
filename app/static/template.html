@@ -113,7 +113,7 @@ cv.onmouseup = () => {
   drag = null; draw();
 };
 
-const TYPES = { text: '자유텍스트', candidates: '후보목록', phone: '전화번호', number: '숫자', circle: '표시 선택(동그라미·체크 등)' };
+const TYPES = { text: '자유텍스트', candidates: '후보목록', phone: '전화번호', number: '숫자', time: '시각(9 또는 9:00)', circle: '표시 선택(동그라미·체크 등)' };
 
 let dragIdx = null;  // 행 드래그로 순서 변경 (순서 = 검수 표시·내보내기 컬럼 순서)
 
@@ -132,7 +132,7 @@ function renderFields() {
         onchange="fields[${i}].candidates=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc((f.candidates || []).join('\n'))}</textarea></td>
       <td><textarea rows="1" style="width:100%" placeholder="모델에게 줄 추가 설명"
         onchange="fields[${i}].hint=this.value.trim()">${esc(f.hint || '')}</textarea>
-        ${f.type === 'number' ? `<div class="hint">범위:
+        ${['number', 'time'].includes(f.type) ? `<div class="hint">범위:
           <input type="number" style="width:60px" value="${f.min ?? ''}" placeholder="min"
             onchange="fields[${i}].min=this.value===''?undefined:+this.value">~
           <input type="number" style="width:60px" value="${f.max ?? ''}" placeholder="max"

@@ -212,6 +212,9 @@ def _prompt(f: dict) -> str:
                  "숫자와 하이픈만 출력하라. ")
     elif t == "number":
         base += "숫자다. 숫자만 출력하라. "
+    elif t == "time":
+        base += ("시각이다. '9', '09:00', '18:00' 같은 형태로 쓰여 있다. "
+                 "쓰인 그대로 숫자와 콜론만 출력하라. ")
     elif f.get("candidates"):
         base += f"값은 다음 후보 중 하나다: {', '.join(f['candidates'])}. 가장 일치하는 후보를 그대로 출력하라. "
     base += "설명 없이 값만 출력하라. 비어 있으면 '없음'을 출력하라."
@@ -240,7 +243,7 @@ def _second_pass(crop_png: bytes, f: dict, value: str, conf: float):
     확신 있게 내놓아(같은 crop이 1.15x=없음/2x=이순덕/2.3x=이관희) 오히려
     그럴듯한 오답을 만들었다 — 빈 값 + 낮은 신뢰도로 검수에 넘기는 게 정직하다.
     """
-    if f["type"] == "number" and ("min" in f or "max" in f):
+    if f["type"] in ("number", "time") and ("min" in f or "max" in f):
         value, conf = postprocess.clamp_number(
             value, conf, f.get("min", 0), f.get("max", 10 ** 9))
     elif f["type"] == "phone":

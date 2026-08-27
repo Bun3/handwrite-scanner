@@ -54,6 +54,17 @@ def test_empty_answer_not_forced():
     assert validate("없음", "phone") == ("", 0.3)
 
 
+def test_time_type():
+    from app.postprocess import validate
+    assert validate("9", "time") == ("9", 0.9)
+    assert validate("09:00", "time") == ("9", 0.9)         # 정시 → 시 정수 (규칙 산술 호환)
+    assert validate("18:00", "time") == ("18", 0.9)
+    assert validate("9:30", "time") == ("9:30", 0.9)       # 분 있으면 H:MM
+    assert validate("18시", "time") == ("18", 0.9)
+    assert validate("없음", "time") == ("", 0.3)
+    assert validate("99:00", "time")[1] == 0.3             # 시각 아님
+
+
 def test_optional_field_empty_is_calm():
     """'비어있어도 정상' 필드는 빈 값이 빨간색(0.3)이 아니라 0.9."""
     from app.worker import _post
