@@ -18,6 +18,53 @@ def _pad(img_width: int) -> int:
     return max(8, img_width // 100)
 
 
+_GAP = 25   # 잉크 확장 시 이 이상 공백(px)이면 다른 글씨로 보고 중단 (~2mm@300dpi)
+_EXT = 150  # 한 방향 최대 확장(px) (~12mm@300dpi)
+
+
+def _grow(profile, lo: int, hi: int) -> tuple[int, int]:
+    """1차원 잉크 프로파일에서 [lo,hi] 구간을 잉크가 끝날 때까지 확장."""
+    import numpy as np
+    n = len(profile)
+    lo, hi = max(0, lo), min(hi, n - 1)
+    while hi + 1 < n:
+        seg = profile[hi + 1:min(hi + 1 + _GAP, n)]
+        if not seg.any():
+            break
+        hi = hi + 1 + int(np.flatnonzero(seg).max())
+    while lo > 0:
+        seg = profile[max(lo - _GAP, 0):lo]
+        if not seg.any():
+            break
+        lo = max(lo - _GAP, 0) + int(np.flatnonzero(seg).min())
+    return lo, hi
+
+
+def _ink_box(aligned, ref_gray, box, pad) -> tuple[int, int, int, int]:
+    """crop 영역 계산. 손글씨 잉크(사진에서 어둡지만 기준 양식엔 없는 픽셀)가
+    경계에 걸쳐 있으면 잉크가 끝날 때까지 crop을 넓힌다 — 박스 밖으로 삐져나간
+    글씨(실측: 시각을 칸 오른쪽에 쓴 문서) 절단 방지."""
+    x, y, w, h = box
+    W, H = aligned.width, aligned.height
+    base = (max(0, x - pad), max(0, y - pad), min(W, x + w + pad), min(H, y + h + pad))
+    if ref_gray is None:
+        return base
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return base
+    wx0, wy0 = max(0, x - pad - _EXT), max(0, y - pad - _EXT)
+    wx1, wy1 = min(W, x + w + pad + _EXT), min(H, y + h + pad + _EXT)
+    photo = np.array(aligned.convert("L").crop((wx0, wy0, wx1, wy1)))
+    printed = cv2.dilate((ref_gray[wy0:wy1, wx0:wx1] < 128).astype(np.uint8),
+                         np.ones((7, 7), np.uint8)) > 0
+    ink = (photo < 140) & ~printed
+    lo_x, hi_x = _grow(ink.any(axis=0), base[0] - wx0, base[2] - wx0 - 1)
+    lo_y, hi_y = _grow(ink.any(axis=1), base[1] - wy0, base[3] - wy0 - 1)
+    return wx0 + lo_x, wy0 + lo_y, wx0 + hi_x + 1, wy0 + hi_y + 1
+
+
 class _Cancelled(Exception):
     pass
 
@@ -80,6 +127,7 @@ def _process(job_id: str, st: dict) -> None:
     done = jobs.results(job_id) or []
     results = done if all(p.get("page") == i for i, p in enumerate(done)) else []
     job_dir = jobs.JOBS_DIR / job_id
+    ref_cache: dict = {}  # 템플릿별 기준 이미지(grayscale) — 잉크 확장용
     for page_no, img_path in enumerate(images):
         if page_no < len(results):
             continue
@@ -102,8 +150,17 @@ def _process(job_id: str, st: dict) -> None:
             tpl, aligned = best_template(data, detect_pool)
             ok = tpl is not None
         if tpl:
+            name = tpl["name"]
+            if name not in ref_cache:
+                try:
+                    import numpy as np
+                    from PIL import Image
+                    ref_cache[name] = np.array(
+                        Image.open(templates_store.reference_path(name)).convert("L"))
+                except Exception:
+                    ref_cache[name] = None
             fields = _recognize_fields(job_id, st, tpl, aligned, page_no,
-                                       len(images), job_dir)
+                                       len(images), job_dir, ref_cache[name])
             warnings = _apply_rules(tpl, fields)
             results.append({"page": page_no, "aligned": ok,
                             "template": tpl["name"], "fields": fields,
@@ -122,17 +179,15 @@ def _process(job_id: str, st: dict) -> None:
         jobs.write_results(job_id, results)
 
 
-def _recognize_fields(job_id, st, tpl, aligned, page_no, total_pages, job_dir):
+def _recognize_fields(job_id, st, tpl, aligned, page_no, total_pages, job_dir,
+                      ref_gray=None):
     aligned.save(job_dir / f"page_{page_no:03d}.png")
     out = []
     for i, f in enumerate(tpl["fields"]):
         _check_cancel(job_id)
         st["progress"] = f"{page_no + 1}/{total_pages}페이지 · {i + 1}/{len(tpl['fields'])} {f['label']}"
         jobs.write_status(job_id, st)
-        x, y, w, h = f["box"]
-        pad = _pad(aligned.width)
-        crop = aligned.crop((max(0, x - pad), max(0, y - pad),
-                             x + w + pad, y + h + pad))
+        crop = aligned.crop(_ink_box(aligned, ref_gray, f["box"], _pad(aligned.width)))
         if crop.width < 1000:  # 작은 crop은 VLM 인식률이 떨어짐 → 업스케일
             s = min(3, 1000 / crop.width)
             crop = crop.resize((int(crop.width * s), int(crop.height * s)))
