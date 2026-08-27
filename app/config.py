@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 GITHUB_REPO = "Bun3/handwrite-scanner"
 
 if getattr(sys, "frozen", False):  # PyInstaller 배포판: exe 옆에 engine/data
