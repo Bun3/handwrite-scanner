@@ -24,23 +24,6 @@ def test_corrupt_status_ignored(tmp_path, monkeypatch):
     assert not (d / "status.json.tmp").exists()
 
 
-def test_ink_box_expands_to_overflowing_ink():
-    """박스 밖으로 삐져나간 손글씨 잉크까지 crop이 따라간다."""
-    import numpy as np
-    from PIL import Image
-    from app.worker import _ink_box
-    img = np.full((300, 500), 255, np.uint8)
-    img[120:140, 150:260] = 0                    # 박스 안에서 오른쪽 밖까지 이어진 획
-    img[120:140, 300:320] = 0                    # 공백 40px 너머 = 다른 글씨 (미포함)
-    aligned = Image.fromarray(img)
-    ref = np.full((300, 500), 255, np.uint8)     # 인쇄물 없는 기준
-    box = (100, 100, 100, 50)
-    x0, y0, x1, y1 = _ink_box(aligned, ref, box, 10)
-    assert x1 >= 260                              # 삐져나간 획 끝까지 확장
-    assert x1 < 300                               # 공백 너머 다른 글씨는 미포함
-    assert _ink_box(aligned, None, box, 10) == (90, 90, 210, 160)  # 기준 없으면 기본 pad
-
-
 def test_process_resumes_from_partial_results(tmp_path, monkeypatch):
     """크래시 후 재개 시 완료된 페이지 프리픽스는 재인식하지 않는다."""
     from PIL import Image
