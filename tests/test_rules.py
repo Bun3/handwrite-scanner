@@ -49,6 +49,32 @@ def test_apply_rules_label_syntax():
     assert f[0]["confidence"] == 0.5 and f[1]["confidence"] == 0.5
 
 
+def test_time_values_in_rules():
+    """'9:30' 같은 시각 값도 시간 소수로 변환되어 규칙에 참여한다."""
+    from app.rules import to_number
+    assert to_number("9:30") == 9.5
+    assert to_number("9") == 9
+    assert to_number("병가") is None
+    assert check("end >= start", {"end": "18", "start": "9:30"}) is True
+    assert check("end >= start", {"end": "9:30", "start": "18"}) is False
+    assert evaluate("end - start", {"end": "18", "start": "9:30"}) == 8.5
+
+
+def test_infer_fills_half_hours():
+    from app.worker import _apply_rules
+    tpl = {"fields": [{"id": "s", "label": "시작"}, {"id": "e", "label": "종료"},
+                      {"id": "t", "label": "총", "min": 1, "max": 9}],
+           "rules": ["t = e - s"]}
+    f = [{"id": "s", "label": "시작", "value": "9:30", "confidence": 0.9},
+         {"id": "e", "label": "종료", "value": "18", "confidence": 0.9},
+         {"id": "t", "label": "총", "value": "", "confidence": 0.3}]
+    w = _apply_rules(tpl, f)
+    assert f[2]["value"] == "8.5" and any("8.5" in x for x in w)
+    assert _apply_rules(tpl, f) == []             # 채워진 8.5는 등식 일치 → 통과
+    f[2]["value"] = "8"                           # 등식 위반
+    assert any("검증 실패" in x for x in _apply_rules(tpl, f))
+
+
 def test_assign_rule():
     assert parse_assign("total = end - start") == ("total", "end - start")
     assert parse_assign("end - start >= 0") is None

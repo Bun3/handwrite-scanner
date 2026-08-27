@@ -8,6 +8,7 @@
 """
 import ast
 import operator
+import re
 
 _BIN = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
         ast.FloorDiv: operator.floordiv, ast.Mod: operator.mod}
@@ -15,10 +16,29 @@ _CMP = {ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
         ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge}
 
 
+_TIME = re.compile(r"^(\d{1,2}):(\d{2})$")
+
+
+def to_number(v: str) -> int | float | None:
+    """필드 값 → 숫자. '9:30' 같은 시각은 시간 소수(9.5)로 변환해 산술 가능하게."""
+    v = str(v).strip()
+    m = _TIME.match(v)
+    if m and int(m.group(2)) < 60:
+        return int(m.group(1)) + int(m.group(2)) / 60
+    try:
+        return int(v)
+    except ValueError:
+        try:
+            return float(v)
+        except ValueError:
+            return None
+
+
 def _eval(node, vars_):
     if isinstance(node, ast.Expression):
         return _eval(node.body, vars_)
-    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+    if isinstance(node, ast.Constant) \
+            and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
         return node.value
     if isinstance(node, ast.Name):
         if node.id not in vars_:
@@ -65,32 +85,32 @@ def rule_ids(expr: str) -> set[str]:
             if isinstance(n, ast.Name)}
 
 
-def _int_vars(expr: str, values: dict[str, str]) -> dict[str, int] | None:
+def _num_vars(expr: str, values: dict[str, str]) -> dict | None:
     vars_ = {}
     for fid in {n.id for n in ast.walk(ast.parse(expr, mode="eval"))
                 if isinstance(n, ast.Name)}:
-        v = str(values.get(fid, "")).strip()
-        if not v.lstrip("-").isdigit():
+        n = to_number(values.get(fid, ""))
+        if n is None:
             return None
-        vars_[fid] = int(v)
+        vars_[fid] = n
     return vars_
 
 
 def check(expr: str, values: dict[str, str]) -> bool | None:
-    """규칙 평가. 반환: True(통과)/False(위반)/None(판단 불가 — 값이 정수 아님)."""
-    vars_ = _int_vars(expr, values)
+    """규칙 평가. 반환: True(통과)/False(위반)/None(판단 불가 — 값이 숫자 아님)."""
+    vars_ = _num_vars(expr, values)
     if vars_ is None:
         return None
     return bool(_eval(ast.parse(expr, mode="eval"), vars_))
 
 
-def evaluate(expr: str, values: dict[str, str]) -> int | None:
-    """산술식 값 계산. 쓰인 필드가 정수가 아니면 None."""
-    vars_ = _int_vars(expr, values)
+def evaluate(expr: str, values: dict[str, str]) -> int | float | None:
+    """산술식 값 계산. 쓰인 필드가 숫자로 해석되지 않으면 None."""
+    vars_ = _num_vars(expr, values)
     if vars_ is None:
         return None
     v = _eval(ast.parse(expr, mode="eval"), vars_)
-    return int(v) if isinstance(v, int) and not isinstance(v, bool) else None
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
 
 def validate_expr(expr: str) -> str | None:

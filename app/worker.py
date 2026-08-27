@@ -170,16 +170,18 @@ def _apply_rules(tpl: dict, fields: list) -> list[str]:
                 val = rules_mod.evaluate(rhs, values)
                 if target is None or val is None:
                     continue
-                cur = str(target["value"]).strip()
-                if cur.lstrip("-").isdigit():
-                    violated = int(cur) != val
+                cur_num = rules_mod.to_number(target["value"])
+                if cur_num is not None:
+                    violated = abs(cur_num - val) > 1e-6
                 else:
                     fdef = next((x for x in tpl["fields"] if x["id"] == tid), {})
                     if fdef.get("min", val) <= val <= fdef.get("max", val):
-                        target["value"] = str(val)
+                        # 8.0 → "8", 8.5 → "8.5"
+                        shown = str(int(val)) if float(val).is_integer() else str(round(val, 2))
+                        target["value"] = shown
                         target["confidence"] = 0.75  # 유추값 — 검수 훑어보기 선
-                        values[tid] = target["value"]
-                        warnings.append(f"빈 값 유추: {target['label']} = {val}")
+                        values[tid] = shown
+                        warnings.append(f"빈 값 유추: {target['label']} = {shown}")
                     continue
             else:
                 violated = rules_mod.check(resolved, values) is False
