@@ -95,6 +95,15 @@ def test_export_formats():
     assert "3,,," in csv_out
 
 
+def test_export_keeps_original_page_numbers():
+    """건너뜀 제외·필터 후에도 페이지 번호는 원본 번호 유지 (검수 화면과 일치)."""
+    from app.export import build
+    res = [{"page": 0, "fields": [{"label": "성명", "value": "홍길동"}]},
+           {"page": 2, "fields": [{"label": "성명", "value": "김영수"}]}]  # 1페이지 건너뜀
+    csv_out = build("j1", res, "csv")[0]
+    assert "1,홍길동" in csv_out and "3,김영수" in csv_out and "\n2," not in csv_out
+
+
 def test_export_merged():
     from app.export import merged
     j1 = ({"id": "job1", "created": "2026-08-25", "template": "휴가"},

@@ -15,7 +15,9 @@
   <h3 id="title">검수</h3>
   <select id="fieldFilter" onchange="applyFilter()" style="margin-bottom:10px">
     <option value="">(모든 필드)</option>
-  </select> <span class="hint">필드 하나만 골라 전 페이지를 모아서 검수할 수 있습니다</span>
+  </select>
+  <input id="valueFilter" placeholder="값 필터 (부분일치)" oninput="applyFilter()" style="width:170px">
+  <span class="hint">필드를 고르면 그 필드만, 값까지 넣으면 그 값의 문서만 봅니다 — 표 내보내기에도 그대로 적용</span>
   <div id="alignWarn" class="warn" style="display:none">
     ⚠ 템플릿 정합에 실패해 단순 크기 맞춤으로 처리했습니다. 결과를 꼼꼼히 확인하세요.
   </div>
@@ -48,6 +50,7 @@ async function load() {
     pageImg.src = `/api/jobs/${id}/page/${page.page}`;
     await new Promise(r => pageImg.onload = r);
     const h = document.createElement('h4');
+    h.dataset.page = page.page;
     h.textContent = `${page.page + 1} 페이지 — ` +
       (page.skipped ? '건너뜀 (지정 양식과 다른 서류)' :
        page.template ? `양식: ${page.template}` : '양식 자동 인식 안 됨 (템플릿 없이 추출)');
@@ -62,15 +65,15 @@ async function load() {
       const div = document.createElement('div');
       div.className = 'warn';
       div.textContent = '⚠ ' + w;
-      if (filterValue()) div.style.display = 'none';  // 로딩 중 필터가 걸려 있어도 준수
       list.appendChild(div);
     }
     for (const f of page.fields) {
       const row = document.createElement('div');
       row.className = 'field-row ' + confClass(f.confidence);
       row.dataset.label = f.label;
+      row.dataset.page = page.page;
+      row.dataset.value = f.value || '';
       addFilterOption(f.label);
-      if (filterValue() && f.label !== filterValue()) row.style.display = 'none';
       const label = document.createElement('div');
       label.className = 'label';
       label.textContent = f.label + (f.confidence < 0.7 ? ' ⚠' : '');
@@ -92,6 +95,7 @@ async function load() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ page: page.page, id: f.id, value: inp.value }) })).json();
         row.className = 'field-row c-green';   // 사람이 확인한 값 = 100%
+        row.dataset.value = inp.value;         // 값 필터가 수정된 값을 반영하도록
         label.textContent = f.label;
         conf.textContent = '100%';
         if (r.suggest) {           // 후보목록 학습 제안
@@ -125,10 +129,13 @@ async function load() {
       }
       list.appendChild(row);
     }
+    // 로딩 중에 필터를 걸어도 이후 추가되는 페이지까지 일관 적용
+    if (filterValue() || valueFilterText()) applyFilter();
   }
 }
 
 const filterValue = () => document.getElementById('fieldFilter').value;
+const valueFilterText = () => document.getElementById('valueFilter').value.trim();
 
 function addFilterOption(label) {
   const sel = document.getElementById('fieldFilter');
@@ -136,11 +143,22 @@ function addFilterOption(label) {
 }
 
 function applyFilter() {
-  const v = document.getElementById('fieldFilter').value;
+  const fld = filterValue(), val = valueFilterText().toLowerCase();
+  let pages = null;  // null = 전체 문서
+  if (fld && val) {  // 값 필터: 해당 필드 값이 부분일치하는 문서만
+    pages = new Set();
+    document.querySelectorAll('.field-row').forEach(r => {
+      if (r.dataset.label === fld && (r.dataset.value || '').toLowerCase().includes(val))
+        pages.add(r.dataset.page);
+    });
+  }
   document.querySelectorAll('.field-row').forEach(r =>
-    r.style.display = (!v || r.dataset.label === v) ? '' : 'none');
+    r.style.display = ((!fld || r.dataset.label === fld)
+                       && (!pages || pages.has(r.dataset.page))) ? '' : 'none');
+  document.querySelectorAll('h4').forEach(h =>
+    h.style.display = (!pages || pages.has(h.dataset.page)) ? '' : 'none');
   document.querySelectorAll('.warn').forEach(w => {  // 필터 중엔 페이지 경고 숨김
-    if (w.id !== 'alignWarn') w.style.display = v ? 'none' : '';
+    if (w.id !== 'alignWarn') w.style.display = fld ? 'none' : '';
   });
 }
 
@@ -154,7 +172,10 @@ function pdf(kind) { location.href = `/api/jobs/${id}/pdf?kind=${kind}`; }
 function original() { location.href = `/api/jobs/${id}/original`; }
 function preview(kind) { window.open(`/api/jobs/${id}/pdf?kind=${kind}&inline=1`); }
 function exportFile() {
-  location.href = `/api/jobs/${id}/export?fmt=${document.getElementById('expFmt').value}`;
+  let url = `/api/jobs/${id}/export?fmt=${document.getElementById('expFmt').value}`;
+  if (filterValue()) url += `&field=${encodeURIComponent(filterValue())}`;
+  if (filterValue() && valueFilterText()) url += `&value=${encodeURIComponent(valueFilterText())}`;
+  location.href = url;
 }
 load();
 </script>

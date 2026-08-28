@@ -34,8 +34,10 @@ def build(job_id: str, res: list, fmt: str) -> tuple[str, str, str]:
             if f["label"] not in labels:
                 labels.append(f["label"])
     header = ["페이지"] + labels
-    rows = [[str(i + 1)] + [dict((f["label"], f.get("value", "")) for f in p["fields"])
-                            .get(l, "") for l in labels]
+    # 페이지 번호는 원본 번호 보존 — 건너뜀 제외·필터 후에도 검수 화면과 일치
+    rows = [[str(p.get("page", i) + 1)]
+            + [dict((f["label"], f.get("value", "")) for f in p["fields"])
+               .get(l, "") for l in labels]
             for i, p in enumerate(res)]
     if fmt == "md":
         out = ["| " + " | ".join(header) + " |",
