@@ -33,6 +33,8 @@
     <option value="txt">텍스트 (.txt)</option>
     <option value="csv">CSV (.csv)</option>
   </select>
+  <label class="hint" style="white-space:nowrap"><input type="checkbox" id="expOnly">
+    선택 필드 컬럼만</label>
   <button class="secondary" onclick="exportFile()">표 내보내기</button>
 </div>
 </main>
@@ -173,8 +175,11 @@ function original() { location.href = `/api/jobs/${id}/original`; }
 function preview(kind) { window.open(`/api/jobs/${id}/pdf?kind=${kind}&inline=1`); }
 function exportFile() {
   let url = `/api/jobs/${id}/export?fmt=${document.getElementById('expFmt').value}`;
-  if (filterValue()) url += `&field=${encodeURIComponent(filterValue())}`;
-  if (filterValue() && valueFilterText()) url += `&value=${encodeURIComponent(valueFilterText())}`;
+  if (filterValue()) {
+    url += `&field=${encodeURIComponent(filterValue())}`;
+    if (valueFilterText()) url += `&value=${encodeURIComponent(valueFilterText())}`;
+    if (document.getElementById('expOnly').checked) url += '&only=1';
+  }
   location.href = url;
 }
 load();

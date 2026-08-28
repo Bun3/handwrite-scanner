@@ -364,7 +364,8 @@ def export_merged(template: str, fmt: str = "csv"):
 
 
 @app.get("/api/jobs/{job_id}/export")
-def job_export(job_id: str, fmt: str = "md", field: str = "", value: str = ""):
+def job_export(job_id: str, fmt: str = "md", field: str = "", value: str = "",
+               only: bool = False):
     if fmt not in ("md", "txt", "csv"):
         raise HTTPException(400, "fmt는 md|txt|csv")
     res = jobs.results(_safe(job_id))
@@ -372,11 +373,13 @@ def job_export(job_id: str, fmt: str = "md", field: str = "", value: str = ""):
         raise HTTPException(404, "결과 없음")
     # 건너뜀 페이지(데이터 없음)는 제외 — 원본 페이지 번호가 보존되므로 흔적은 남는다
     res = [p for p in res if not p.get("skipped")]
-    if field:  # 검수 화면의 필드/값 필터 그대로 내보내기
-        res = [{**p, "fields": [f for f in p["fields"] if f["label"] == field]}
-               for p in res
+    if field:  # 검수 화면의 필드/값 필터 그대로 내보내기 — 기본은 행만 거르고 전체 컬럼
+        res = [p for p in res
                if any(f["label"] == field and value.lower() in (f["value"] or "").lower()
                       for f in p["fields"])]
+        if only:  # 옵션: 선택한 필드 컬럼만
+            res = [{**p, "fields": [f for f in p["fields"] if f["label"] == field]}
+                   for p in res]
     content, fname, mt = export.build(job_id, res, fmt)
     return Response(content, media_type=mt, headers={
         "Content-Disposition": f'attachment; filename="{fname}"'})
