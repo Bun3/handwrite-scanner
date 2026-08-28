@@ -13,11 +13,14 @@
 <main>
 <div class="card">
   <h3 id="title">검수</h3>
-  <select id="fieldFilter" onchange="applyFilter()" style="margin-bottom:10px">
-    <option value="">(모든 필드)</option>
-  </select>
-  <input id="valueFilter" placeholder="값 필터 (부분일치)" oninput="applyFilter()" style="width:170px">
-  <span class="hint">필드를 고르면 그 필드만, 값까지 넣으면 그 값의 문서만 봅니다 — 표 내보내기에도 그대로 적용</span>
+  <div style="margin-bottom:10px">
+    <span class="hint">문서 필터:</span>
+    <select id="pageField" onchange="applyFilter()"><option value="">(필드 선택)</option></select>
+    <input id="pageValue" placeholder="값 (부분일치)" oninput="applyFilter()" style="width:150px">
+    &nbsp; <span class="hint">표시 필드:</span>
+    <select id="fieldFilter" onchange="applyFilter()"><option value="">(모든 필드)</option></select>
+    <div class="hint">문서 필터는 값이 일치하는 문서만 남기고(전체 필드 표시), 표시 필드는 고른 필드 행만 보여줍니다 — 표 내보내기에도 동일하게 적용됩니다</div>
+  </div>
   <div id="alignWarn" class="warn" style="display:none">
     ⚠ 템플릿 정합에 실패해 단순 크기 맞춤으로 처리했습니다. 결과를 꼼꼼히 확인하세요.
   </div>
@@ -34,7 +37,7 @@
     <option value="csv">CSV (.csv)</option>
   </select>
   <label class="hint" style="white-space:nowrap"><input type="checkbox" id="expOnly">
-    선택 필드 컬럼만</label>
+    표시 필드 컬럼만</label>
   <button class="secondary" onclick="exportFile()">표 내보내기</button>
 </div>
 </main>
@@ -66,6 +69,7 @@ async function load() {
     for (const w of page.warnings || []) {
       const div = document.createElement('div');
       div.className = 'warn';
+      div.dataset.page = page.page;
       div.textContent = '⚠ ' + w;
       list.appendChild(div);
     }
@@ -132,35 +136,42 @@ async function load() {
       list.appendChild(row);
     }
     // 로딩 중에 필터를 걸어도 이후 추가되는 페이지까지 일관 적용
-    if (filterValue() || valueFilterText()) applyFilter();
+    if (filterValue() || pageFilter().field) applyFilter();
   }
 }
 
-const filterValue = () => document.getElementById('fieldFilter').value;
-const valueFilterText = () => document.getElementById('valueFilter').value.trim();
+const filterValue = () => document.getElementById('fieldFilter').value;      // 표시 필드
+const pageFilter = () => ({ field: document.getElementById('pageField').value,
+                            value: document.getElementById('pageValue').value.trim() });
 
 function addFilterOption(label) {
-  const sel = document.getElementById('fieldFilter');
-  if (![...sel.options].some(o => o.value === label)) sel.add(new Option(label, label));
+  for (const id of ['fieldFilter', 'pageField']) {
+    const sel = document.getElementById(id);
+    if (![...sel.options].some(o => o.value === label)) sel.add(new Option(label, label));
+  }
 }
 
 function applyFilter() {
-  const fld = filterValue(), val = valueFilterText().toLowerCase();
+  const disp = filterValue();
+  const pf = pageFilter();
   let pages = null;  // null = 전체 문서
-  if (fld && val) {  // 값 필터: 해당 필드 값이 부분일치하는 문서만
+  if (pf.field && pf.value) {  // 문서 필터: 해당 필드 값이 부분일치하는 문서만
     pages = new Set();
+    const v = pf.value.toLowerCase();
     document.querySelectorAll('.field-row').forEach(r => {
-      if (r.dataset.label === fld && (r.dataset.value || '').toLowerCase().includes(val))
+      if (r.dataset.label === pf.field && (r.dataset.value || '').toLowerCase().includes(v))
         pages.add(r.dataset.page);
     });
   }
   document.querySelectorAll('.field-row').forEach(r =>
-    r.style.display = ((!fld || r.dataset.label === fld)
+    r.style.display = ((!disp || r.dataset.label === disp)
                        && (!pages || pages.has(r.dataset.page))) ? '' : 'none');
   document.querySelectorAll('h4').forEach(h =>
     h.style.display = (!pages || pages.has(h.dataset.page)) ? '' : 'none');
-  document.querySelectorAll('.warn').forEach(w => {  // 필터 중엔 페이지 경고 숨김
-    if (w.id !== 'alignWarn') w.style.display = fld ? 'none' : '';
+  document.querySelectorAll('.warn').forEach(w => {
+    if (w.id === 'alignWarn') return;
+    // 표시 필드로 좁힌 동안엔 페이지 경고 숨김, 문서 필터는 숨긴 문서 것만 숨김
+    w.style.display = (disp || (pages && !pages.has(w.dataset.page))) ? 'none' : '';
   });
 }
 
@@ -175,11 +186,11 @@ function original() { location.href = `/api/jobs/${id}/original`; }
 function preview(kind) { window.open(`/api/jobs/${id}/pdf?kind=${kind}&inline=1`); }
 function exportFile() {
   let url = `/api/jobs/${id}/export?fmt=${document.getElementById('expFmt').value}`;
-  if (filterValue()) {
-    url += `&field=${encodeURIComponent(filterValue())}`;
-    if (valueFilterText()) url += `&value=${encodeURIComponent(valueFilterText())}`;
-    if (document.getElementById('expOnly').checked) url += '&only=1';
-  }
+  const pf = pageFilter();
+  if (pf.field && pf.value)   // 문서 필터 → 행
+    url += `&field=${encodeURIComponent(pf.field)}&value=${encodeURIComponent(pf.value)}`;
+  if (filterValue() && document.getElementById('expOnly').checked)  // 표시 필드 → 컬럼
+    url += `&col=${encodeURIComponent(filterValue())}`;
   location.href = url;
 }
 load();
