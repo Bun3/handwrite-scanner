@@ -12,6 +12,17 @@ app = FastAPI(title="handwrite-scanner")
 _update = {"current": VERSION, "available": False}
 
 
+@app.middleware("http")
+async def _no_stale_ui(request, call_next):
+    """UI 파일은 항상 서버와 재검증 — 업데이트 후 구버전 CSS/JS가 새 HTML에
+    섞여 화면이 깨지는 문제 방지. 미변경이면 304라 비용 없음."""
+    resp = await call_next(request)
+    p = request.url.path
+    if p == "/" or p.endswith((".html", ".css", ".js")):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 def _ver(tag: str) -> tuple:
     return tuple(int(x) for x in tag.lstrip("v").split("."))
 
