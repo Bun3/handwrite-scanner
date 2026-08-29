@@ -13,14 +13,20 @@
 <main>
 <div class="card">
   <h3 id="title">검수</h3>
-  <div style="margin-bottom:10px">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+    <span class="hint">표시 필드:</span>
+    <select id="fieldFilter" onchange="applyFilter()"><option value="">(모든 필드)</option></select>
+    <span style="margin-left:auto"></span>
+    <span class="hint">정렬:</span>
+    <select id="sortField" onchange="sortPages()"><option value="">(페이지 순)</option></select>
+    <button class="secondary" id="sortDir" style="padding:2px 9px" title="방향 전환"
+      onclick="sortAsc=!sortAsc;this.textContent=sortAsc?'↑':'↓';sortPages()">↑</button>
     <span class="hint">문서 필터:</span>
     <select id="pageField" onchange="applyFilter()"><option value="">(필드 선택)</option></select>
-    <input id="pageValue" placeholder="값 (부분일치)" oninput="applyFilter()" style="width:150px">
-    &nbsp; <span class="hint">표시 필드:</span>
-    <select id="fieldFilter" onchange="applyFilter()"><option value="">(모든 필드)</option></select>
-    <div class="hint">문서 필터는 값이 일치하는 문서만 남기고(전체 필드 표시), 표시 필드는 고른 필드 행만 보여줍니다 — 표 내보내기에도 동일하게 적용됩니다</div>
+    <input id="pageValue" placeholder="값 (부분일치)" oninput="applyFilter()" style="width:130px">
   </div>
+  <div class="hint" style="margin-bottom:8px">문서 필터는 값이 일치하는 문서만 남기고(전체 필드 표시),
+    표시 필드는 고른 필드 행만 보여줍니다 — 표 내보내기에도 동일하게 적용됩니다</div>
   <div id="alignWarn" class="warn" style="display:none">
     ⚠ 템플릿 정합에 실패해 단순 크기 맞춤으로 처리했습니다. 결과를 꼼꼼히 확인하세요.
   </div>
@@ -54,6 +60,10 @@ async function load() {
     const pageImg = new Image();
     pageImg.src = `/api/jobs/${id}/page/${page.page}`;
     await new Promise(r => pageImg.onload = r);
+    const pageDiv = document.createElement('div');   // 페이지 묶음 — 정렬 시 통째로 이동
+    pageDiv.className = 'page';
+    pageDiv.dataset.page = page.page;
+    list.appendChild(pageDiv);
     const h = document.createElement('h4');
     h.dataset.page = page.page;
     h.textContent = `${page.page + 1} 페이지 — ` +
@@ -65,13 +75,13 @@ async function load() {
     view.textContent = '원본 보기';
     view.style.cssText = 'margin-left:10px;font-size:13px;font-weight:400';
     h.appendChild(view);
-    list.appendChild(h);
+    pageDiv.appendChild(h);
     for (const w of page.warnings || []) {
       const div = document.createElement('div');
       div.className = 'warn';
       div.dataset.page = page.page;
       div.textContent = '⚠ ' + w;
-      list.appendChild(div);
+      pageDiv.appendChild(div);
     }
     for (const f of page.fields) {
       const row = document.createElement('div');
@@ -133,10 +143,11 @@ async function load() {
           : '✋ 빈칸으로 인식됨 — 원본을 확인하세요';
         row.appendChild(note);
       }
-      list.appendChild(row);
+      pageDiv.appendChild(row);
     }
-    // 로딩 중에 필터를 걸어도 이후 추가되는 페이지까지 일관 적용
+    // 로딩 중에 필터·정렬을 걸어도 이후 추가되는 페이지까지 일관 적용
     if (filterValue() || pageFilter().field) applyFilter();
+    if (document.getElementById('sortField').value) sortPages();
   }
 }
 
@@ -145,10 +156,32 @@ const pageFilter = () => ({ field: document.getElementById('pageField').value,
                             value: document.getElementById('pageValue').value.trim() });
 
 function addFilterOption(label) {
-  for (const id of ['fieldFilter', 'pageField']) {
+  for (const id of ['fieldFilter', 'pageField', 'sortField']) {
     const sel = document.getElementById(id);
     if (![...sel.options].some(o => o.value === label)) sel.add(new Option(label, label));
   }
+}
+
+let sortAsc = true;
+function sortPages() {
+  const fld = document.getElementById('sortField').value;
+  const list = document.getElementById('list');
+  const pages = [...list.querySelectorAll(':scope > .page')];
+  const key = p => {
+    if (!fld) return null;
+    const r = [...p.querySelectorAll('.field-row')].find(x => x.dataset.label === fld);
+    return r ? (r.dataset.value || '') : '';
+  };
+  const dir = sortAsc ? 1 : -1;
+  pages.sort((a, b) => {
+    if (!fld) return (a.dataset.page - b.dataset.page) * dir;
+    const va = key(a), vb = key(b);
+    if (!va || !vb) return !va && !vb ? a.dataset.page - b.dataset.page : (!va ? 1 : -1);  // 빈 값은 항상 뒤
+    const na = parseFloat(va), nb = parseFloat(vb);
+    const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : va.localeCompare(vb, 'ko');
+    return (cmp || a.dataset.page - b.dataset.page) * dir;
+  });
+  pages.forEach(p => list.appendChild(p));
 }
 
 function applyFilter() {
