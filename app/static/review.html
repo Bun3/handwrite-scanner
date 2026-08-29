@@ -164,11 +164,16 @@ function addFilterOption(label) {
   }
 }
 
-// 다중 정렬 키 (쿼리의 ORDER BY처럼 키 순서대로 비교, 키마다 방향)
+// 다중 정렬 키 (쿼리의 ORDER BY처럼 키 순서대로 비교, 키마다 방향, ⠿ 드래그로 우선순위 변경)
+let dragKey = null;
 function addSortKey() {
   const wrap = document.createElement('span');
   wrap.className = 'sort-key';
-  wrap.style.whiteSpace = 'nowrap';
+  wrap.style.cssText = 'display:inline-flex;align-items:center;gap:4px;white-space:nowrap';
+  const grab = document.createElement('span');
+  grab.textContent = '⠿';
+  grab.title = '드래그로 우선순위 변경';
+  grab.style.cssText = 'cursor:grab;color:#999';
   const sel = document.createElement('select');
   sel.className = 'sk-field';
   sel.add(new Option('(필드)', ''));
@@ -179,7 +184,7 @@ function addSortKey() {
   dir.className = 'secondary';
   dir.textContent = '↑';
   dir.dataset.asc = '1';
-  dir.style.padding = '2px 8px';
+  dir.style.cssText = 'padding:0 6px;font-size:11px;line-height:1.5';
   dir.onclick = () => {
     dir.dataset.asc = dir.dataset.asc ? '' : '1';
     dir.textContent = dir.dataset.asc ? '↑' : '↓';
@@ -188,9 +193,27 @@ function addSortKey() {
   const del = document.createElement('button');
   del.className = 'danger';
   del.textContent = '×';
-  del.style.padding = '2px 7px';
+  del.style.cssText = 'padding:0 6px;font-size:11px;line-height:1.5';
   del.onclick = () => { wrap.remove(); sortPages(); };
-  wrap.append(sel, dir, del);
+  const col = document.createElement('span');
+  col.style.cssText = 'display:inline-flex;flex-direction:column;gap:2px';
+  col.append(dir, del);
+  wrap.append(grab, sel, col);
+  grab.onmousedown = () => wrap.draggable = true;
+  wrap.ondragstart = e => { dragKey = wrap; e.dataTransfer.effectAllowed = 'move'; };
+  wrap.ondragend = () => { wrap.draggable = false; dragKey = null; };
+  wrap.ondragover = e => { e.preventDefault(); wrap.style.outline = '2px solid #2c7be5'; };
+  wrap.ondragleave = () => wrap.style.outline = '';
+  wrap.ondrop = e => {
+    e.preventDefault();
+    wrap.style.outline = '';
+    if (dragKey && dragKey !== wrap) {
+      // 끌어온 방향에 따라 앞/뒤 배치 — 맨 끝으로도 이동 가능
+      const forward = dragKey.compareDocumentPosition(wrap) & Node.DOCUMENT_POSITION_FOLLOWING;
+      forward ? wrap.after(dragKey) : wrap.before(dragKey);
+      sortPages();
+    }
+  };
   document.getElementById('sortKeys').appendChild(wrap);
 }
 
