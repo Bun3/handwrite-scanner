@@ -5,10 +5,12 @@
 <title>검수 - handwrite-scanner</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="app.css">
+<script src="theme.js"></script>
 </head>
 <body>
 <header><b>handwrite-scanner</b>
   <a href="/">작업</a><a href="template.html">템플릿</a>
+  <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="라이트/다크 전환">☾</button>
 </header>
 <main>
 <div class="card">
@@ -138,7 +140,7 @@ async function load() {
       if (!f.value && f.confidence <= 0.5) {  // 모델이 빈칸/무표시라 답함 — 사람이 판단
         const note = document.createElement('span');
         note.className = 'hint';
-        note.style.color = 'var(--bad, #c0392b)';
+        note.style.color = 'var(--danger)';
         note.textContent = f.type === 'circle'
           ? '✋ 표시 없음으로 인식됨 — 원본을 보고 직접 선택하세요'
           : '✋ 빈칸으로 인식됨 — 원본을 확인하세요';
@@ -173,7 +175,7 @@ function addSortKey() {
   const grab = document.createElement('span');
   grab.textContent = '⠿';
   grab.title = '드래그로 우선순위 변경';
-  grab.style.cssText = 'cursor:grab;color:#999';
+  grab.className = 'grab';
   const sel = document.createElement('select');
   sel.className = 'sk-field';
   sel.add(new Option('(필드)', ''));
@@ -202,7 +204,7 @@ function addSortKey() {
   grab.onmousedown = () => wrap.draggable = true;
   wrap.ondragstart = e => { dragKey = wrap; e.dataTransfer.effectAllowed = 'move'; };
   wrap.ondragend = () => { wrap.draggable = false; dragKey = null; };
-  wrap.ondragover = e => { e.preventDefault(); wrap.style.outline = '2px solid #2c7be5'; };
+  wrap.ondragover = e => { e.preventDefault(); wrap.style.outline = '2px solid var(--accent)'; };
   wrap.ondragleave = () => wrap.style.outline = '';
   wrap.ondrop = e => {
     e.preventDefault();
