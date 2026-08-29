@@ -13,16 +13,18 @@
 <main>
 <div class="card">
   <h3 id="title">검수</h3>
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
     <span class="hint">표시 필드:</span>
     <select id="fieldFilter" onchange="applyFilter()"><option value="">(모든 필드)</option></select>
     <span style="margin-left:auto"></span>
-    <span class="hint">정렬:</span>
-    <span id="sortKeys"></span>
-    <button class="secondary" onclick="addSortKey()" style="padding:2px 8px" title="정렬 키 추가">＋</button>
     <span class="hint">문서 필터:</span>
     <select id="pageField" onchange="applyFilter()"><option value="">(필드 선택)</option></select>
-    <input id="pageValue" placeholder="값 (부분일치)" oninput="applyFilter()" style="width:130px">
+    <input id="pageValue" placeholder="값 (부분일치)" oninput="applyFilter()" style="width:150px">
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+    <span class="hint">정렬:</span>
+    <span id="sortKeys" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span>
+    <button class="secondary" onclick="addSortKey()" style="padding:2px 8px" title="정렬 키 추가">＋</button>
   </div>
   <div class="hint" style="margin-bottom:8px">문서 필터는 값이 일치하는 문서만 남기고(전체 필드 표시),
     표시 필드는 고른 필드 행만 보여줍니다 — 표 내보내기에도 동일하게 적용됩니다</div>
