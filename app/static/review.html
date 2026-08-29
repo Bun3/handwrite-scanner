@@ -18,9 +18,8 @@
     <select id="fieldFilter" onchange="applyFilter()"><option value="">(모든 필드)</option></select>
     <span style="margin-left:auto"></span>
     <span class="hint">정렬:</span>
-    <select id="sortField" onchange="sortPages()"><option value="">(페이지 순)</option></select>
-    <button class="secondary" id="sortDir" style="padding:2px 9px" title="방향 전환"
-      onclick="sortAsc=!sortAsc;this.textContent=sortAsc?'↑':'↓';sortPages()">↑</button>
+    <span id="sortKeys"></span>
+    <button class="secondary" onclick="addSortKey()" style="padding:2px 8px" title="정렬 키 추가">＋</button>
     <span class="hint">문서 필터:</span>
     <select id="pageField" onchange="applyFilter()"><option value="">(필드 선택)</option></select>
     <input id="pageValue" placeholder="값 (부분일치)" oninput="applyFilter()" style="width:130px">
@@ -147,7 +146,7 @@ async function load() {
     }
     // 로딩 중에 필터·정렬을 걸어도 이후 추가되는 페이지까지 일관 적용
     if (filterValue() || pageFilter().field) applyFilter();
-    if (document.getElementById('sortField').value) sortPages();
+    if (sortKeys().length) sortPages();
   }
 }
 
@@ -156,30 +155,70 @@ const pageFilter = () => ({ field: document.getElementById('pageField').value,
                             value: document.getElementById('pageValue').value.trim() });
 
 function addFilterOption(label) {
-  for (const id of ['fieldFilter', 'pageField', 'sortField']) {
-    const sel = document.getElementById(id);
+  const sels = [document.getElementById('fieldFilter'), document.getElementById('pageField'),
+                ...document.querySelectorAll('#sortKeys .sk-field')];
+  for (const sel of sels) {
     if (![...sel.options].some(o => o.value === label)) sel.add(new Option(label, label));
   }
 }
 
-let sortAsc = true;
+// 다중 정렬 키 (쿼리의 ORDER BY처럼 키 순서대로 비교, 키마다 방향)
+function addSortKey() {
+  const wrap = document.createElement('span');
+  wrap.className = 'sort-key';
+  wrap.style.whiteSpace = 'nowrap';
+  const sel = document.createElement('select');
+  sel.className = 'sk-field';
+  sel.add(new Option('(필드)', ''));
+  [...document.getElementById('fieldFilter').options].slice(1)
+    .forEach(o => sel.add(new Option(o.value, o.value)));
+  sel.onchange = sortPages;
+  const dir = document.createElement('button');
+  dir.className = 'secondary';
+  dir.textContent = '↑';
+  dir.dataset.asc = '1';
+  dir.style.padding = '2px 8px';
+  dir.onclick = () => {
+    dir.dataset.asc = dir.dataset.asc ? '' : '1';
+    dir.textContent = dir.dataset.asc ? '↑' : '↓';
+    sortPages();
+  };
+  const del = document.createElement('button');
+  del.className = 'danger';
+  del.textContent = '×';
+  del.style.padding = '2px 7px';
+  del.onclick = () => { wrap.remove(); sortPages(); };
+  wrap.append(sel, dir, del);
+  document.getElementById('sortKeys').appendChild(wrap);
+}
+
+function sortKeys() {
+  return [...document.querySelectorAll('#sortKeys .sort-key')]
+    .map(k => ({ fld: k.querySelector('.sk-field').value,
+                 asc: !!k.querySelector('button').dataset.asc }))
+    .filter(k => k.fld);
+}
+
 function sortPages() {
-  const fld = document.getElementById('sortField').value;
+  const keys = sortKeys();
   const list = document.getElementById('list');
   const pages = [...list.querySelectorAll(':scope > .page')];
-  const key = p => {
-    if (!fld) return null;
+  const val = (p, fld) => {
     const r = [...p.querySelectorAll('.field-row')].find(x => x.dataset.label === fld);
     return r ? (r.dataset.value || '') : '';
   };
-  const dir = sortAsc ? 1 : -1;
   pages.sort((a, b) => {
-    if (!fld) return (a.dataset.page - b.dataset.page) * dir;
-    const va = key(a), vb = key(b);
-    if (!va || !vb) return !va && !vb ? a.dataset.page - b.dataset.page : (!va ? 1 : -1);  // 빈 값은 항상 뒤
-    const na = parseFloat(va), nb = parseFloat(vb);
-    const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : va.localeCompare(vb, 'ko');
-    return (cmp || a.dataset.page - b.dataset.page) * dir;
+    for (const k of keys) {
+      const va = val(a, k.fld), vb = val(b, k.fld);
+      if (!va || !vb) {
+        if (va !== vb) return !va ? 1 : -1;   // 빈 값은 방향 무관 항상 뒤
+        continue;                              // 둘 다 비면 다음 키로
+      }
+      const na = parseFloat(va), nb = parseFloat(vb);
+      const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : va.localeCompare(vb, 'ko');
+      if (cmp) return cmp * (k.asc ? 1 : -1);
+    }
+    return a.dataset.page - b.dataset.page;   // 전 키 동률 → 페이지 순
   });
   pages.forEach(p => list.appendChild(p));
 }
@@ -226,6 +265,7 @@ function exportFile() {
     url += `&col=${encodeURIComponent(filterValue())}`;
   location.href = url;
 }
+addSortKey();   // 정렬 키 한 칸 기본 노출
 load();
 </script>
 </body>
