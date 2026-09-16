@@ -268,6 +268,27 @@ def job_cancel(job_id: str):
     raise HTTPException(409, "이미 종료된 작업입니다")
 
 
+@app.post("/api/jobs/{job_id}/resume")
+def job_resume(job_id: str):
+    """완료된 페이지 결과를 보존하고 오류·중단된 작업을 이어간다."""
+    safe_id = _safe(job_id)
+    st = jobs.status(safe_id)
+    if not st:
+        raise HTTPException(404, "작업 없음")
+    if st["state"] not in ("error", "cancelled"):
+        raise HTTPException(409, "오류 또는 중단된 작업만 이어갈 수 있습니다")
+    if (jobs.JOBS_DIR / safe_id / "results.json").exists():
+        results = jobs.results(safe_id)
+        if (not isinstance(results, list)
+                or any(not isinstance(p, dict) or p.get("page") != i
+                       for i, p in enumerate(results))):
+            raise HTTPException(409, "저장된 결과가 손상되어 이어갈 수 없습니다. 처음부터 재인식을 선택하세요")
+    st.update(state="queued", progress="이어하기 대기", error=None)
+    jobs.write_status(safe_id, st)
+    worker.enqueue(safe_id)
+    return {"ok": True}
+
+
 @app.post("/api/jobs/{job_id}/rerun")
 def job_rerun(job_id: str):
     """저장된 원본으로 처음부터 재인식 (템플릿·규칙 변경 후 다시 돌릴 때).

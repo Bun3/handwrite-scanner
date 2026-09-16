@@ -28,6 +28,7 @@ class _Cancelled(Exception):
 
 
 def enqueue(job_id: str) -> None:
+    _cancel.discard(job_id)  # 중단된 작업의 새 실행에 이전 중단 요청을 적용하지 않는다.
     _q.put(job_id)
 
 
@@ -54,7 +55,7 @@ def _loop() -> None:
     while True:
         job_id = _q.get()
         st = jobs.status(job_id)
-        if st is None or st["state"] == "cancelled":  # 대기 중 삭제·중단된 작업
+        if st is None or st["state"] != "queued":  # 삭제·중단되거나 이미 처리한 큐 항목
             _cancel.discard(job_id)
             continue
         try:

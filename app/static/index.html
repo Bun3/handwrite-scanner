@@ -121,7 +121,9 @@ async function refresh() {
       <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}
       ${['running', 'queued'].includes(s.state) ? `<button class="secondary" style="padding:3px 10px;font-size:12px"
         onclick="cancelJob('${esc(s.id)}')">중단</button>` : `<button class="secondary" style="padding:3px 10px;font-size:12px"
-        onclick="rerunJob('${esc(s.id)}')">재인식</button>`}
+        onclick="rerunJob('${esc(s.id)}')">처음부터 재인식</button>`}
+      ${['error', 'cancelled'].includes(s.state) ? `<button class="secondary" style="padding:3px 10px;font-size:12px"
+        onclick="resumeJob('${esc(s.id)}')" title="완료된 페이지는 유지하고, 미완료 페이지부터 다시 처리합니다">이어하기</button>` : ''}
       ${s.state !== 'running' ? `<button class="danger" style="padding:3px 10px;font-size:12px"
         onclick="delJob('${esc(s.id)}')">삭제</button>` : ''}</td>`;
   }
@@ -179,6 +181,12 @@ async function cancelJob(id) {
   if (!confirm('이 작업을 중단할까요? (진행 중인 필드 하나는 마저 처리 후 멈춥니다)')) return;
   const r = await fetch(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
   if (!r.ok) alert((await r.json()).detail || '중단 실패');
+  refresh();
+}
+
+async function resumeJob(id) {
+  const r = await fetch(`/api/jobs/${encodeURIComponent(id)}/resume`, { method: 'POST' });
+  if (!r.ok) alert((await r.json()).detail || '이어하기 실패');
   refresh();
 }
 
