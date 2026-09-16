@@ -139,3 +139,19 @@ a { color: var(--accent); }
 .job-error { color: var(--danger); }
 details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font-size: 12px; user-select: text; }
 summary { cursor: pointer; }
+
+#up { display: block; }
+#up > input[type=file] { margin-bottom: 14px; }
+#templateChoices { display: flex; flex-wrap: wrap; gap: 12px; }
+#templateChoices label { display: inline-flex; align-items: center; gap: 4px; }
+#up fieldset { border: 1px solid var(--border, #888); border-radius: 6px; margin: 10px 0; }
+.input-file { margin: 16px 0; }
+.input-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.input-actions[hidden] { display: none; }
+.input-actions input { width: 160px; }
+.page-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); gap: 10px; }
+.page-choice { border: 1px solid var(--border, #888); border-radius: 6px; overflow: hidden; }
+.page-choice label { display: block; padding: 8px; cursor: pointer; }
+.page-choice:has(input:checked) { outline: 2px solid #3b82f6; }
+.page-choice img { width: 100%; height: 160px; object-fit: contain; background: white; }
+.page-choice a { display: block; text-align: center; }

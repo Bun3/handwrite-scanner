@@ -25,7 +25,9 @@ def screen():
         page.on('pageerror', lambda error: state['errors'].append(str(error)))
         def api(route):
             path = route.request.url.split('/api/')[-1]
-            if path == 'jobs' and route.request.method == 'POST':
+            if path == 'intake' and route.request.method == 'POST':
+                route.fulfill(json={'token': 'draft', 'files': [{'index': 0, 'name': 'test.pdf', 'pages': 4, 'pdf': True}]}); return
+            if path == 'intake/draft/start' and route.request.method == 'POST':
                 state['pending'].append(route); return
             payload = {'jobs': state['jobs'], 'templates': [{'name': 'form', 'fields': []}],
                        'health': {'llm': False}, 'models': {'ram_gb': 16, 'models': []}, 'update': {}}.get(path, {})
@@ -39,19 +41,19 @@ def screen():
 def test_upload_pending_visible_then_accepted(screen):
     page, state, url = screen
     page.goto(url)
-    page.select_option('#tplSel', 'form')
     page.set_input_files('input[type=file]', {'name': 'test.pdf', 'mimeType': 'application/pdf', 'buffer': b'%PDF-test'})
+    pw.expect(page.locator('#pageSelection')).to_contain_text('4페이지')
     page.click('#submitJob')
     pw.expect(page.locator('#submitJob')).to_be_disabled()
     pw.expect(page.locator('#jobs')).to_contain_text('업로드 중')
-    page.wait_for_function('document.getElementById("uploadStatus").textContent.includes("파일을 전달")')
+    page.wait_for_function('document.getElementById("uploadStatus").textContent.includes("선택한 페이지")')
     assert len(state['pending']) == 1
     state['jobs'] = [{'id': 'accepted', 'state': 'queued', 'phase': 'preparing', 'template': 'form', 'progress': '문서 준비 대기'}]
     state['pending'].pop().fulfill(json={'id': 'accepted'})
     pw.expect(page.locator('#uploadStatus')).to_contain_text('접수 완료')
     pw.expect(page.locator('#jobs')).to_contain_text('accepted')
     pw.expect(page.locator('#submitJob')).to_be_enabled()
-    assert page.locator('#tplSel').input_value() == 'form'
+    assert page.locator('#templateChoices input[value="form"]').is_checked()
     assert not state['errors']
 
 
@@ -59,6 +61,7 @@ def test_upload_failure_keeps_file_and_shows_guidance(screen):
     page, state, url = screen
     page.goto(url)
     page.set_input_files('input[type=file]', {'name': 'test.pdf', 'mimeType': 'application/pdf', 'buffer': b'%PDF-test'})
+    pw.expect(page.locator('#pageSelection')).to_contain_text('4페이지')
     page.click('#submitJob')
     pw.expect(page.locator('#submitJob')).to_be_disabled()
     page.wait_for_timeout(100)
@@ -68,6 +71,35 @@ def test_upload_failure_keeps_file_and_shows_guidance(screen):
     assert page.locator('input[type=file]').evaluate('(e) => e.files.length') == 1
     pw.expect(page.locator('#submitJob')).to_be_enabled()
     assert not state['errors']
+
+
+def test_selected_pages_and_templates_are_submitted(screen):
+    page, state, url = screen
+    page.route('**/api/templates', lambda r: r.fulfill(json=[{'name': 'a'}, {'name': 'b'}]))
+    page.goto(url)
+    page.set_input_files('input[type=file]', {'name': 'test.pdf', 'mimeType': 'application/pdf', 'buffer': b'%PDF-test'})
+    pw.expect(page.locator('#pageSelection')).to_contain_text('4페이지')
+    page.locator('#templateChoices input[value="b"]').uncheck()
+    page.get_by_role('button', name='전체 해제', exact=True).click()
+    page.get_by_label('페이지 범위').fill('2,4')
+    page.get_by_role('button', name='범위 적용').click()
+    page.click('#submitJob')
+    page.wait_for_timeout(100)
+    assert state['pending'][0].request.post_data_json == {'templates': ['a'], 'pages': [[2, 4]]}
+    state['pending'].pop().fulfill(json={'id': 'selected'})
+    pw.expect(page.locator('#uploadStatus')).to_contain_text('접수 완료')
+    assert not state['errors']
+
+
+def test_no_pages_selected_cannot_start(screen):
+    page, state, url = screen
+    page.goto(url)
+    page.set_input_files('input[type=file]', {'name': 'test.pdf', 'mimeType': 'application/pdf', 'buffer': b'%PDF-test'})
+    pw.expect(page.locator('#pageSelection')).to_contain_text('4페이지')
+    page.get_by_role('button', name='전체 해제', exact=True).click()
+    page.click('#submitJob')
+    pw.expect(page.locator('#notifications')).to_contain_text('페이지를 하나 이상')
+    assert not state['pending']
 
 
 def test_job_error_stays_in_table_and_escapes_details(screen):

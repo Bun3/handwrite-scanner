@@ -240,6 +240,28 @@ def template_autodetect(name: str):
 
 # ---------- 작업 ----------
 
+@app.post('/api/intake')
+async def input_create(files: list[UploadFile]):
+    from app import intake
+    pairs = [(f.filename or 'upload.png', await f.read()) for f in files]
+    return await run_in_threadpool(intake.create, pairs)
+
+
+@app.get('/api/intake/{token}/files/{file_index}/pages/{page}')
+def input_preview(token: str, file_index: int, page: int):
+    from app import intake
+    return Response(intake.preview(token, file_index, page), media_type='image/png',
+                    headers={'Cache-Control': 'private, max-age=3600'})
+
+
+@app.post('/api/intake/{token}/start')
+def input_start(token: str, body: dict):
+    from app import intake
+    jid = intake.start(token, body.get('templates'), body.get('pages'))
+    if jobs.status(jid)['state'] == 'queued':
+        worker.enqueue(jid)
+    return {'id': jid}
+
 @app.post("/api/jobs")
 async def job_create(files: list[UploadFile], template: str = Form("")):
     if template:

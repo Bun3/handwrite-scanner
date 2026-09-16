@@ -9,7 +9,8 @@ _volatile_status = {}  # 디스크에 오류 상태조차 저장할 수 없을 �
 _io_lock = threading.RLock()
 
 
-def create(template: str | None, files: list[tuple[str, bytes]], *, defer=False) -> str:
+def create(template: str | None, files: list[tuple[str, bytes]], *, defer=False,
+           templates=None, selections=None) -> str:
     job_id = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
     d = JOBS_DIR / job_id
     (d / "input").mkdir(parents=True)
@@ -20,9 +21,11 @@ def create(template: str | None, files: list[tuple[str, bytes]], *, defer=False)
         for i, (name, data) in enumerate(files):
             stored = f"{i:03d}.bin"
             (d / "uploads" / stored).write_bytes(data)
-            manifest.append({"name": name, "stored": stored})
+            manifest.append({"name": name, "stored": stored,
+                             "pages": selections[i] if selections is not None else None})
         _write_atomic(job_id, "uploads.json", json.dumps(manifest, ensure_ascii=False))
-        write_status(job_id, {"id": job_id, "template": template, "state": "queued",
+        options = {'templates': templates} if templates is not None else {}
+        write_status(job_id, {"id": job_id, "template": template, "state": "queued", **options,
                              "phase": "preparing", "inputs_ready": False,
                              "progress": "접수 완료 · 문서 준비 대기", "created": time.strftime("%Y-%m-%d %H:%M:%S")})
         return job_id
@@ -56,8 +59,12 @@ def prepare_inputs(job_id, st, check_cancel):
     d = JOBS_DIR / job_id
     manifest = json.loads((d / "uploads.json").read_text(encoding="utf-8"))
     page = 0
+    sources = []
     for index, item in enumerate(manifest):
         check_cancel()
+        selected = item.get('pages')
+        if selected == []:
+            continue
         src = d / "uploads" / item["stored"]
         with src.open('rb') as stream:
             is_pdf = stream.read(5) == b'%PDF-'
@@ -72,18 +79,23 @@ def prepare_inputs(job_id, st, check_cancel):
                 if doc.needs_pass:
                     raise UserError('pdf_password', '암호가 설정된 PDF입니다.', '암호를 해제한 PDF를 다시 등록하세요.')
                 for pg in doc:
+                    if selected is not None and pg.number + 1 not in selected:
+                        continue
                     check_cancel()
                     st['progress'] = f"PDF 준비 · {index + 1}/{len(manifest)} 파일 · {pg.number + 1}/{len(doc)}페이지"
                     write_status(job_id, st)
                     pg.get_pixmap(dpi=300).save(d / 'input' / f'{page:03d}.png')
+                    sources.append({'source_file': item['name'], 'source_page': pg.number + 1})
                     page += 1
         else:
             with Image.open(src) as img:
                 img.convert('RGB').save(d / 'input' / f'{page:03d}.png')
+            sources.append({'source_file': item['name'], 'source_page': 1})
             page += 1
     if not page:
         raise UserError('empty_input', '처리할 문서 페이지가 없습니다.', '이미지 또는 페이지가 있는 PDF를 등록하세요.')
-    st.update(inputs_ready=True, phase='recognizing', progress=f'문서 준비 완료 · {page}페이지')
+    _write_atomic(job_id, 'input_pages.json', json.dumps(sources, ensure_ascii=False))
+    st.update(inputs_ready=True, selected_pages=page, phase='recognizing', progress=f'문서 준비 완료 · {page}페이지')
     write_status(job_id, st)
 
 
@@ -145,6 +157,10 @@ def list_jobs() -> list[dict]:
 
 def input_images(job_id: str) -> list:
     return sorted((JOBS_DIR / job_id / "input").iterdir())
+
+
+def page_sources(job_id):
+    return _read(job_id, 'input_pages.json') or []
 
 
 def delete(job_id: str) -> None:

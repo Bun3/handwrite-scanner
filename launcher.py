@@ -11,6 +11,19 @@ import threading
 import webbrowser
 
 
+def create_runtime_mutex():
+    """설치 프로그램이 실행 중인 서버를 감지한다. 프로세스 종료 시 자동 해제."""
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel.CreateMutexW.restype = wintypes.HANDLE
+    handle = kernel.CreateMutexW(None, False, 'Local\\HandwriteScannerRunning')
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    return handle
+
+
 def _port_in_use(port):
     with socket.socket() as probe:
         probe.settimeout(.5)
@@ -47,6 +60,8 @@ def _show_startup_error(message, no_browser=False):
 
 
 def main() -> None:
+    if getattr(sys, 'frozen', False) and sys.platform == 'win32':
+        create_runtime_mutex()
     if len(sys.argv) > 1 and sys.argv[1] == "cli":
         from cli import main as cli_main
         sys.exit(cli_main(sys.argv[2:]))

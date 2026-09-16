@@ -6,6 +6,23 @@ import pytest
 import launcher
 
 
+@pytest.mark.skipif(launcher.sys.platform != 'win32', reason='Windows installer mutex')
+def test_installer_can_detect_running_program():
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.OpenMutexW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel.OpenMutexW.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    owned = launcher.create_runtime_mutex()
+    try:
+        probe = kernel.OpenMutexW(0x00100000, False, 'Local\\HandwriteScannerRunning')
+        assert probe
+        kernel.CloseHandle(probe)
+    finally:
+        kernel.CloseHandle(owned)
+
+
 def test_old_server_explains_mixed_version(monkeypatch):
     from app import config
     monkeypatch.setattr(config, 'VERSION', '0.7.1')

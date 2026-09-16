@@ -12,12 +12,14 @@ def merged(template: str, job_list: list[tuple[dict, list]], fmt: str
     pages = []
     for st, res in job_list:
         for page in res or []:
+            if page.get('skipped'):
+                continue
             if (page.get("template") or st.get("template")) != template:
                 continue  # 혼합 작업에서 다른 양식 페이지 제외
             fields = ([{"label": "작업ID", "value": st["id"]},
                        {"label": "처리일시", "value": st.get("created", "")}]
                       + page["fields"])
-            pages.append({"fields": fields})
+            pages.append({**page, "fields": fields})
     content, _, mt = build(template, pages, fmt)
     return content, f"{template}-통합.{fmt}", mt
 
@@ -33,9 +35,10 @@ def build(job_id: str, res: list, fmt: str) -> tuple[str, str, str]:
         for f in p["fields"]:
             if f["label"] not in labels:
                 labels.append(f["label"])
-    header = ["페이지"] + labels
+    has_source = any(p.get('source_file') for p in res)
+    header = (["원본 파일"] if has_source else []) + ["페이지"] + labels
     # 페이지 번호는 원본 번호 보존 — 건너뜀 제외·필터 후에도 검수 화면과 일치
-    rows = [[str(p.get("page", i) + 1)]
+    rows = [([p.get('source_file', '')] if has_source else []) + [str(p.get('source_page', p.get("page", i) + 1))]
             + [dict((f["label"], f.get("value", "")) for f in p["fields"])
                .get(l, "") for l in labels]
             for i, p in enumerate(res)]
