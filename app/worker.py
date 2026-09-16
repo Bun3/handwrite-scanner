@@ -8,6 +8,7 @@ import traceback
 
 from app import jobs, llm, postprocess, templates_store
 from app.align import HAVE_CV2, best_template, to_reference
+from app.errors import UserError, explain
 
 _q: "queue.Queue[str]" = queue.Queue()
 _cancel: set[str] = set()
@@ -61,21 +62,39 @@ def _loop() -> None:
         try:
             st["state"] = "running"
             jobs.write_status(job_id, st)
-            _process(job_id, st)
+            def report_phase(phase):
+                st['phase'] = phase
+                jobs.write_status(job_id, st)
+            token = llm.progress_reporter.set(report_phase)
+            try:
+                _process(job_id, st)
+            finally:
+                llm.progress_reporter.reset(token)
             st["state"] = "done"
             st["progress"] = ""
         except _Cancelled:
             st["state"] = "cancelled"
             st["progress"] = ""
-        except Exception:
+        except Exception as exc:
             st["state"] = "error"
             st["error"] = traceback.format_exc(limit=3)
+            st["error_info"] = explain(exc)
+            if st['error_info']['code'].startswith('engine_') or st['error_info']['code'] == 'memory':
+                st['error'] += '\n' + llm.log_tail()
         _cancel.discard(job_id)
-        jobs.write_status(job_id, st)
+        try:
+            jobs.write_status(job_id, st)
+        except OSError as exc:
+            jobs.remember_status_failure(job_id, st, exc)
 
 
 def _process(job_id: str, st: dict) -> None:
     tpl_fixed = templates_store.get(st["template"]) if st.get("template") else None
+    if st.get('template') and tpl_fixed is None:
+        raise UserError('template_missing', f"선택한 템플릿을 찾을 수 없습니다: {st['template']}", '템플릿 폴더와 template.json을 복원하거나 같은 이름으로 템플릿을 등록한 뒤 이어하기를 누르세요.')
+    if tpl_fixed:
+        templates_store.reference_path(tpl_fixed['name'])
+    jobs.prepare_inputs(job_id, st, lambda: _check_cancel(job_id))
     detect_pool = None
     if not tpl_fixed:  # 템플릿 미지정 = 페이지별 자동 판별 (실패 시 freeform)
         detect_pool = [(t, templates_store.reference_path(t["name"]))
@@ -90,6 +109,8 @@ def _process(job_id: str, st: dict) -> None:
         if page_no < len(results):
             continue
         _check_cancel(job_id)
+        st.update(phase='recognizing', progress=f'{page_no + 1}/{len(images)}페이지 · 양식 확인 중')
+        jobs.write_status(job_id, st)
         data = img_path.read_bytes()
         tpl, aligned, ok = tpl_fixed, None, None
         if tpl_fixed:
@@ -103,6 +124,8 @@ def _process(job_id: str, st: dict) -> None:
                                 "template": None, "skipped": True, "fields": [],
                                 "warnings": ["지정한 양식과 일치하지 않아 인식하지 않고 건너뛰었습니다"]})
                 jobs.write_results(job_id, results)
+                st['progress'] = f'{page_no + 1}/{len(images)}페이지 · 지정 양식과 달라 건너뜀'
+                jobs.write_status(job_id, st)
                 continue
         elif detect_pool:
             tpl, aligned = best_template(data, detect_pool)

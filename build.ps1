@@ -2,11 +2,17 @@
 # 실행: powershell -ExecutionPolicy Bypass -File build.ps1
 $ErrorActionPreference = "Stop"
 & "$PSScriptRoot\.venv\Scripts\pip" install -q pyinstaller
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller 설치 실패" }
+& "$PSScriptRoot\.venv\Scripts\pyinstaller" --noconfirm --clean --onefile `
+    --name handwrite-updater update_helper.py
+if ($LASTEXITCODE -ne 0) { throw "업데이트 도우미 빌드 실패" }
 & "$PSScriptRoot\.venv\Scripts\pyinstaller" --noconfirm --clean --onedir `
     --name handwrite-scanner `
     --add-data "app/static;static" `
     --collect-submodules app `
     launcher.py
+if ($LASTEXITCODE -ne 0) { throw "프로그램 빌드 실패" }
+Copy-Item -LiteralPath "$PSScriptRoot\dist\handwrite-updater.exe" -Destination "$PSScriptRoot\dist\handwrite-scanner\handwrite-updater.exe"
 # 서버 모드 실행용 바로가기 배치
 Set-Content -Encoding utf8 "$PSScriptRoot\dist\handwrite-scanner\server-mode.bat" `
     "@echo off`r`n`"%~dp0handwrite-scanner.exe`" --server`r`npause"

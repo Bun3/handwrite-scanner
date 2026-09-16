@@ -132,3 +132,10 @@ a { color: var(--accent); }
   padding: 10px 14px; border-radius: 7px; font-size: 14px; margin-bottom: 12px;
 }
 .grab { cursor: grab; color: var(--muted); }
+#notifications { position: fixed; right: 18px; bottom: 18px; z-index: 1000; width: min(480px, calc(100vw - 36px)); max-height: 70vh; overflow: auto; }
+.notice { background: var(--surface); color: var(--text); border: 1px solid var(--warn-line); border-radius: 8px; padding: 12px; margin-top: 8px; box-shadow: 0 4px 20px #0002; }
+.notice > button { float: right; margin-left: 8px; }
+.notice p { margin: 4px 0 10px; }
+.job-error { color: var(--danger); }
+details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font-size: 12px; user-select: text; }
+summary { cursor: pointer; }

@@ -17,6 +17,11 @@ PHONE_PORT = 8001
 
 _token: str | None = None
 _server = None  # uvicorn.Server
+_uploads_active = 0
+
+
+def is_active():
+    return _server is not None or _uploads_active > 0
 
 phone_app = FastAPI()
 
@@ -60,11 +65,16 @@ def page(token: str):
 
 @phone_app.post("/p/{token}/upload")
 async def upload(token: str, files: list[UploadFile]):
+    global _uploads_active
     _check(token)
-    pairs = [(f.filename, await f.read()) for f in files]
-    job_id = jobs.create(None, pairs)  # 템플릿 자동 판별
-    worker.enqueue(job_id)
-    return {"id": job_id}
+    _uploads_active += 1
+    try:
+        pairs = [(f.filename, await f.read()) for f in files]
+        job_id = jobs.create(None, pairs)  # 템플릿 자동 판별
+        worker.enqueue(job_id)
+        return {"id": job_id}
+    finally:
+        _uploads_active -= 1
 
 
 def _lan_ip() -> str:

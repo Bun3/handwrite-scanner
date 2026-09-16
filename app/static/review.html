@@ -6,6 +6,7 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="app.css">
 <script src="theme.js"></script>
+<script src="feedback.js"></script>
 </head>
 <body>
 <header><b>handwrite-scanner</b>
@@ -55,14 +56,12 @@ const id = new URLSearchParams(location.search).get('id');
 document.getElementById('title').textContent = '검수 — ' + id;
 
 async function load() {
-  const d = await (await fetch('/api/jobs/' + id)).json();
+  const d = await (await apiFetch('/api/jobs/' + id)).json();
   const list = document.getElementById('list');
   list.innerHTML = '';
-  for (const page of d.results) {
+  for (const page of d.results || []) {
     if (page.aligned === false) document.getElementById('alignWarn').style.display = '';
-    const pageImg = new Image();
-    pageImg.src = `/api/jobs/${id}/page/${page.page}`;
-    await new Promise(r => pageImg.onload = r);
+    const pageImg = await loadImage(`/api/jobs/${id}/page/${page.page}`);
     const pageDiv = document.createElement('div');   // 페이지 묶음 — 정렬 시 통째로 이동
     pageDiv.className = 'page';
     pageDiv.dataset.page = page.page;
@@ -110,7 +109,7 @@ async function load() {
       inp.value = f.value || '';
       inp.title = 'LLM 원문: ' + (f.raw || '');
       inp.onchange = async () => {
-        const r = await (await fetch(`/api/jobs/${id}/fields`, { method: 'PATCH',
+        const r = await (await apiFetch(`/api/jobs/${id}/fields`, { method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ page: page.page, id: f.id, value: inp.value }) })).json();
         row.className = 'field-row c-green';   // 사람이 확인한 값 = 100%
@@ -122,7 +121,7 @@ async function load() {
           btn.className = 'secondary';
           btn.textContent = `후보목록에 '${s.value}' 추가`;
           btn.onclick = async () => {
-            await fetch(`/api/templates/${encodeURIComponent(s.template)}/candidates`, {
+            await apiFetch(`/api/templates/${encodeURIComponent(s.template)}/candidates`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ field_id: s.field_id, value: s.value }) });
             btn.replaceWith(Object.assign(document.createElement('span'),

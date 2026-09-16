@@ -6,6 +6,7 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="app.css">
 <script src="theme.js"></script>
+<script src="feedback.js"></script>
 </head>
 <body>
 <header><b>handwrite-scanner</b>
@@ -15,9 +16,11 @@
 </header>
 <main>
 <div class="warn" id="updBanner" style="display:none">
-  🔔 새 버전 <b id="updVer"></b>이 나왔습니다.
-  <a id="updLink" target="_blank" rel="noopener">다운로드 페이지 열기</a> —
-  받은 zip을 기존 폴더에 덮어쓰면 모델·작업 기록은 그대로 유지됩니다.
+  <strong id="updateTitle">새 버전 <b id="updVer"></b></strong>
+  <p id="updateStatus" role="status" aria-live="polite"></p>
+  <button id="installUpdate" onclick="installUpdate()" style="display:none">지금 업데이트</button>
+  <a id="updLink" target="_blank" rel="noopener">다운로드 페이지 열기</a>
+  <details id="updateDetails" style="display:none"><summary>기술 상세</summary><pre id="updateTechnical"></pre></details>
 </div>
 <div class="card">
   <h3>문서 사진 업로드</h3>
@@ -27,8 +30,9 @@
   <form id="up">
     <input type="file" name="files" multiple accept="image/*,.pdf" required>
     <select name="template" id="tplSel"><option value="">(자동 판별)</option></select>
-    <button>인식 시작</button>
+    <button id="submitJob">인식 시작</button>
   </form>
+  <p id="uploadStatus" role="status" aria-live="polite" class="hint"></p>
   <p class="hint">CPU에서 문서 1장당 몇 분 걸립니다. 여러 장을 걸어두고 나중에 검수하세요.</p>
   <button class="secondary" onclick="phoneStart()">📱 폰으로 촬영 업로드</button>
   <div id="phoneBox" style="display:none; margin-top:14px; text-align:center">
@@ -69,7 +73,7 @@
 </div>
 </main>
 <script>
-async function j(u, o) { const r = await fetch(u, o); return r.json(); }
+async function j(u, o) { const r = await apiFetch(u, o); return r.json(); }
 // 인식된 문서 내용 등 신뢰할 수 없는 값을 innerHTML에 넣기 전 이스케이프
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -97,27 +101,44 @@ document.getElementById('sf').onsubmit = async e => {
 
 async function mergedExport() {
   const t = document.getElementById('mTpl').value;
-  if (!t) return alert('템플릿이 없습니다');
+  if (!t) return notify('템플릿이 없습니다');
   const url = `/api/export-merged?template=${encodeURIComponent(t)}&fmt=${document.getElementById('mFmt').value}`;
-  const r = await fetch(url).catch(() => null);
+  const r = await apiFetch(url).catch(() => null);
   if (!r || !r.ok) {
     let msg = null;
     try { msg = (await r.json()).detail; } catch {}
-    return alert(msg || '내보낼 완료된 작업이 없습니다');
+    return notify(msg || '내보낼 완료된 작업이 없습니다');
   }
   location.href = url;
 }
 
 async function refresh() {
-  const jobs = await j('/api/jobs');
+  cachedJobs = await j('/api/jobs');
+  renderJobs();
+}
+
+let cachedJobs = [], pendingUpload = false;
+const jobErrorsShown = new Set();
+function renderJobs() {
   const tb = document.getElementById('jobs');
   tb.innerHTML = '<tr><th>ID</th><th>템플릿</th><th>상태</th><th>진행</th><th></th></tr>';
-  for (const s of jobs) {
+  if (pendingUpload) {
+    tb.insertRow().innerHTML = '<td>접수 중</td><td></td><td><span class="badge queued">업로드 중</span></td><td>파일을 서버에 전달하고 있습니다. 이 창을 유지해 주세요.</td><td></td>';
+  }
+  for (const s of cachedJobs) {
     const tr = tb.insertRow();
+    const phase = s.phase === 'engine_loading' ? '엔진 준비 중 · PC 성능에 따라 수 분 걸릴 수 있습니다' :
+                  s.phase === 'preparing' ? '문서 준비 중' : '처리 중';
+    const info = s.error_info || {message: '작업 처리 중 오류가 발생했습니다.', action: '아래 상세 내용을 확인해 주세요. 완료된 페이지는 이어하기로 유지할 수 있습니다.'};
+    const key = s.id + ':' + s.error;
+    if (s.state === 'error' && !jobErrorsShown.has(key)) {
+      jobErrorsShown.add(key); notify(`${s.id}: ${info.message}`, {...info, technical: s.error});
+    }
     tr.innerHTML = `<td>${esc(s.id)}</td><td>${esc(s.template || '-')}</td>
-      <td><span class="badge ${esc(s.state)}">${esc({queued:'대기', running:'처리 중',
+      <td><span class="badge ${esc(s.state)}">${esc({queued:'접수됨 · 대기', running:phase,
         done:'완료', error:'오류', cancelled:'중단됨'}[s.state] || s.state)}</span></td>
-      <td>${esc(s.progress || (s.error ? '오류' : ''))}</td>
+      <td>${s.state === 'error' ? `<div class="hint">${esc(s.progress || '')}</div><div class="job-error">${esc(info.message)}</div><div>${esc(info.action)}</div>
+        <details><summary>기술 상세</summary><pre>${esc(s.error || '')}</pre></details>` : esc(s.progress || '')}</td>
       <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}
       ${['running', 'queued'].includes(s.state) ? `<button class="secondary" style="padding:3px 10px;font-size:12px"
         onclick="cancelJob('${esc(s.id)}')">중단</button>` : `<button class="secondary" style="padding:3px 10px;font-size:12px"
@@ -131,13 +152,29 @@ async function refresh() {
 
 document.getElementById('up').onsubmit = async e => {
   e.preventDefault();
-  await fetch('/api/jobs', { method: 'POST', body: new FormData(e.target) });
-  e.target.reset(); refresh();
+  if (pendingUpload) return;
+  const form = e.target, body = new FormData(form);
+  const controls = [...form.elements], button = document.getElementById('submitJob'), status = document.getElementById('uploadStatus');
+  pendingUpload = true;
+  controls.forEach(el => el.disabled = true);
+  button.textContent = '접수 중…';
+  status.textContent = '파일을 전달하고 있습니다. 접수가 끝나면 문서 준비와 인식이 자동으로 진행됩니다.';
+  renderJobs();
+  try {
+    const result = await j('/api/jobs', { method: 'POST', body });
+    status.textContent = `접수 완료: ${result.id} · 작업 목록에서 준비 상태를 확인할 수 있습니다.`;
+    form.querySelector('input[type=file]').value = '';
+  } catch (error) {
+    status.textContent = `접수 확인 실패: ${error.message} 작업 목록을 먼저 확인한 뒤 다시 시도하세요.`;
+  } finally {
+    pendingUpload = false; controls.forEach(el => el.disabled = false);
+    button.textContent = '인식 시작'; renderJobs(); refresh();
+  }
 };
 
 async function health() {
   const h = await j('/api/health');
-  document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 로딩 중(첫 작업 시 자동 기동)';
+  document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 대기 · 인식 시 자동 준비';
 }
 
 let mdlTimer = null;
@@ -149,6 +186,9 @@ async function loadModels() {
   let anyDownloading = false;
   for (const m of d.models) {
     anyDownloading ||= m.downloading;
+    if (m.error) notify(`${m.label}: 모델 다운로드에 실패했습니다.`, {
+      action: '인터넷 연결과 설치 드라이브의 여유 공간·쓰기 권한을 확인한 뒤 다시 다운로드하세요.', technical: m.error
+    });
     const state = m.error ? `<span class="badge error">실패</span>`
       : m.downloading ? `<span class="badge running">다운로드 ${m.progress}%</span>`
       : m.active ? `<span class="badge done">사용 중</span>`
@@ -160,47 +200,47 @@ async function loadModels() {
     tb.insertRow().innerHTML = `<td>${esc(m.label)}${m.recommended ? ' ⭐' : ''}<br>
         <span class="hint">${esc(m.desc)}</span></td>
       <td>${m.size_gb}GB</td><td>${m.min_ram_gb}GB</td>
-      <td>${state}${m.error ? `<br><span class="hint">${esc(m.error)}</span>` : ''}</td><td>${act}</td>`;
+      <td>${state}${m.error ? '<br><span class="hint">인터넷 연결·저장 공간·쓰기 권한을 확인하고 다시 다운로드하세요.</span><details><summary>기술 상세</summary><pre>' + esc(m.error) + '</pre></details>' : ''}</td><td>${act}</td>`;
   }
   clearTimeout(mdlTimer);
   if (anyDownloading) mdlTimer = setTimeout(loadModels, 3000);
 }
 
 async function mdlDownload(id) {
-  await fetch(`/api/models/${id}/download`, { method: 'POST' });
+  await apiFetch(`/api/models/${id}/download`, { method: 'POST' });
   loadModels();
 }
 
 async function mdlSelect(id) {
-  const r = await fetch(`/api/models/${id}/select`, { method: 'POST' });
-  if (!r.ok) alert((await r.json()).detail || '변경 실패');
+  const r = await apiFetch(`/api/models/${id}/select`, { method: 'POST' });
+  if (!r.ok) notify((await r.json()).detail || '변경 실패');
   loadModels();
 }
 
 async function cancelJob(id) {
   if (!confirm('이 작업을 중단할까요? (진행 중인 필드 하나는 마저 처리 후 멈춥니다)')) return;
-  const r = await fetch(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
-  if (!r.ok) alert((await r.json()).detail || '중단 실패');
+  const r = await apiFetch(`/api/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+  if (!r.ok) notify((await r.json()).detail || '중단 실패');
   refresh();
 }
 
 async function resumeJob(id) {
-  const r = await fetch(`/api/jobs/${encodeURIComponent(id)}/resume`, { method: 'POST' });
-  if (!r.ok) alert((await r.json()).detail || '이어하기 실패');
+  const r = await apiFetch(`/api/jobs/${encodeURIComponent(id)}/resume`, { method: 'POST' });
+  if (!r.ok) notify((await r.json()).detail || '이어하기 실패');
   refresh();
 }
 
 async function rerunJob(id) {
   if (!confirm('저장된 원본으로 처음부터 다시 인식할까요? 기존 인식 결과는 새 결과로 대체됩니다.')) return;
-  const r = await fetch(`/api/jobs/${encodeURIComponent(id)}/rerun`, { method: 'POST' });
-  if (!r.ok) alert((await r.json()).detail || '재인식 실패');
+  const r = await apiFetch(`/api/jobs/${encodeURIComponent(id)}/rerun`, { method: 'POST' });
+  if (!r.ok) notify((await r.json()).detail || '재인식 실패');
   refresh();
 }
 
 async function delJob(id) {
   if (!confirm(`작업 ${id} 을(를) 삭제할까요? 인식 결과·PDF가 함께 삭제됩니다.`)) return;
-  const r = await fetch('/api/jobs/' + encodeURIComponent(id), { method: 'DELETE' });
-  if (!r.ok) alert((await r.json()).detail || '삭제 실패');
+  const r = await apiFetch('/api/jobs/' + encodeURIComponent(id), { method: 'DELETE' });
+  if (!r.ok) notify((await r.json()).detail || '삭제 실패');
   refresh();
 }
 
@@ -212,20 +252,67 @@ async function phoneStart() {
 }
 
 async function phoneStop() {
-  await fetch('/api/phone/stop', { method: 'POST' });
+  await apiFetch('/api/phone/stop', { method: 'POST' });
   document.getElementById('phoneBox').style.display = 'none';
 }
 
+let updateTimer, updateTarget = sessionStorage.getItem('updateTarget'), updateStartedAt = 0;
 async function updateCheck() {
-  const u = await j('/api/update');
-  if (u.available) {
-    document.getElementById('updVer').textContent = 'v' + u.latest;
-    document.getElementById('updLink').href = u.url;
-    document.getElementById('updBanner').style.display = '';
+  clearTimeout(updateTimer);
+  try {
+    // 재시작 중 연결 단절은 예상된 상태이므로 오류 토스트를 반복하지 않는다.
+    const response = await fetch('/api/update');
+    if (!response.ok) throw new Error('업데이트 상태를 확인하지 못했습니다');
+    const u = await response.json(), p = u.progress || {};
+    const active = ['downloading', 'verifying', 'waiting', 'installing', 'restarting'].includes(p.phase);
+    window.updateRestarting = active || !!updateTarget;
+    if (active && !updateStartedAt) updateStartedAt = Date.now();
+    if (u.available || (p.phase && p.phase !== 'idle')) {
+      document.getElementById('updBanner').style.display = '';
+      document.getElementById('updateTitle').textContent = active ? '업데이트 진행 중' :
+        p.phase === 'done' ? '업데이트 완료' : p.phase === 'rolled_back' ? '이전 버전으로 복원됨' :
+        p.phase === 'error' ? '업데이트 확인 필요' : `새 버전 v${u.latest || p.version || ''}`;
+      document.getElementById('updLink').href = u.url || 'https://github.com/Bun3/handwrite-scanner/releases';
+      const button = document.getElementById('installUpdate');
+      button.style.display = u.available && u.supported ? '' : 'none'; button.disabled = active;
+      document.getElementById('updateStatus').textContent = (p.message || (u.supported
+        ? '작업을 마친 뒤 업데이트하세요. 모델·템플릿·작업 기록은 그대로 유지되며 프로그램이 자동으로 재시작됩니다.'
+        : '이 실행 환경에서는 자동 업데이트를 지원하지 않습니다. Windows 배포판에서 사용하세요.')) +
+        (p.phase === 'downloading' ? ` (${p.percent || 0}%)` : '') + (p.action ? ' ' + p.action : '');
+      document.getElementById('updateDetails').style.display = p.technical ? '' : 'none';
+      document.getElementById('updateTechnical').textContent = p.technical || '';
+    }
+    if (updateTarget && u.current === updateTarget && p.phase === 'done') {
+      sessionStorage.removeItem('updateTarget'); location.reload(); return;
+    }
+    if (['error', 'rolled_back'].includes(p.phase)) {
+      updateTarget = null; sessionStorage.removeItem('updateTarget'); window.updateRestarting = false;
+    }
+    updateTimer = setTimeout(updateCheck, active || updateTarget ? 1500 : 15000);
+  } catch {
+    if (updateTarget) {
+      window.updateRestarting = true;
+      document.getElementById('updBanner').style.display = '';
+      document.getElementById('updateStatus').textContent = updateStartedAt && Date.now() - updateStartedAt > 180000
+        ? '재연결이 지연되고 있습니다. 프로그램 실행 상태를 확인하세요. 다운로드한 업데이트의 복구 기록은 data/updates에 남아 있습니다.'
+        : '프로그램이 새 버전으로 재시작 중입니다. 잠시 기다려 주세요.';
+    }
+    updateTimer = setTimeout(updateCheck, 1500);
   }
 }
 
-loadTpl(); refresh(); health(); loadModels(); setInterval(refresh, 3000);
+async function installUpdate() {
+  if (!confirm('새 버전을 설치하고 프로그램을 다시 시작할까요? 모델·템플릿·작업 기록은 유지됩니다.')) return;
+  const button = document.getElementById('installUpdate'); button.disabled = true;
+  try {
+    const u = await j('/api/update/install', {method: 'POST'});
+    updateTarget = u.progress?.version || u.latest;
+    sessionStorage.setItem('updateTarget', updateTarget);
+    updateStartedAt = Date.now(); window.updateRestarting = true; updateCheck();
+  } finally { button.disabled = false; }
+}
+
+loadTpl(); refresh(); health(); loadModels(); setInterval(refresh, 3000); setInterval(health, 10000);
 setTimeout(updateCheck, 3000);
 </script>
 </body>

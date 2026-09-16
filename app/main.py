@@ -1,15 +1,49 @@
 import re
+import asyncio
 
-from fastapi import FastAPI, HTTPException, UploadFile, Form
+from fastapi import FastAPI, HTTPException, UploadFile, Form, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+from starlette.concurrency import run_in_threadpool
+from app.errors import UserError, explain
 
-from app import export, jobs, llm, pdf_gen, templates_store, worker
+from app import export, jobs, llm, pdf_gen, templates_store, worker, updater
 from app.config import GITHUB_REPO, JOBS_DIR, STATIC_DIR, VERSION
 
 app = FastAPI(title="handwrite-scanner")
 
-_update = {"current": VERSION, "available": False}
+
+@app.exception_handler(Exception)
+@app.exception_handler(UserError)
+async def friendly_error(request, exc):
+    import traceback
+    info = explain(exc)
+    info['technical'] = ''.join(traceback.format_exception(exc, limit=4))
+    if info['code'].startswith('engine_'):
+        info['technical'] += '\n' + llm.log_tail()
+    return JSONResponse({'detail': info['message'], 'error_info': info},
+                        status_code=400 if isinstance(exc, UserError) else 500)
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request, exc):
+    return JSONResponse({'detail': '입력값 또는 업로드 파일을 확인하세요.',
+                         'error_info': {'code': 'request_invalid', 'message': '입력값 또는 업로드 파일을 확인하세요.',
+                                        'action': '파일과 필수 항목을 선택한 뒤 다시 시도하세요.'}}, status_code=422)
+
+_mutation_lock = asyncio.Lock()
+
+
+@app.middleware('http')
+async def maintenance_gate(request, call_next):
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        async with _mutation_lock:
+            if updater.busy():
+                return JSONResponse(
+                    {'detail': '업데이트 중에는 새 작업이나 설정 변경을 할 수 없습니다. 잠시 기다려 주세요.'}, status_code=409)
+            return await call_next(request)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -29,13 +63,8 @@ def _ver(tag: str) -> tuple:
 
 def _check_update():
     """GitHub 최신 릴리스 확인. 오프라인이면 조용히 넘어감."""
-    import httpx
     try:
-        r = httpx.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
-                      timeout=5, follow_redirects=True)
-        tag = r.json()["tag_name"]
-        _update.update(latest=tag.lstrip("v"), url=r.json()["html_url"],
-                       available=_ver(tag) > _ver(VERSION))
+        updater.check()
     except Exception:
         pass
 
@@ -61,7 +90,20 @@ def health():
 
 @app.get("/api/update")
 def update_info():
-    return _update
+    return updater.status()
+
+
+@app.post('/api/update/install')
+def update_install(request: Request):
+    local = ('127.0.0.1', '::1', 'localhost')
+    if (not request.client or request.client.host not in ('127.0.0.1', '::1')
+            or request.url.hostname not in local):
+        raise HTTPException(403, '업데이트는 서버 PC에서 localhost 주소로 접속해 진행하세요.')
+    origin = request.headers.get('origin')
+    if origin and origin.rstrip('/') != str(request.base_url).rstrip('/'):
+        raise HTTPException(403, '업데이트는 프로그램 화면에서 직접 시작하세요.')
+    from app import models
+    return updater.begin(jobs.list_jobs(), models.status_list()['models'])
 
 
 # ---------- 인식 모델 ----------
@@ -200,8 +242,10 @@ def template_autodetect(name: str):
 
 @app.post("/api/jobs")
 async def job_create(files: list[UploadFile], template: str = Form("")):
-    pairs = [(f.filename, await f.read()) for f in files]
-    job_id = jobs.create(template or None, pairs)
+    if template:
+        _safe(template)
+    pairs = [(f.filename or 'upload.png', await f.read()) for f in files]
+    job_id = await run_in_threadpool(jobs.create, template or None, pairs, defer=True)
     worker.enqueue(job_id)
     return {"id": job_id}
 
@@ -283,7 +327,7 @@ def job_resume(job_id: str):
                 or any(not isinstance(p, dict) or p.get("page") != i
                        for i, p in enumerate(results))):
             raise HTTPException(409, "저장된 결과가 손상되어 이어갈 수 없습니다. 처음부터 재인식을 선택하세요")
-    st.update(state="queued", progress="이어하기 대기", error=None)
+    st.update(state="queued", progress="이어하기 대기", error=None, error_info=None)
     jobs.write_status(safe_id, st)
     worker.enqueue(safe_id)
     return {"ok": True}
@@ -303,7 +347,7 @@ def job_rerun(job_id: str):
         raise HTTPException(409, "진행 중인 작업입니다")
     # 재인식은 처음부터 — 이전 결과를 지워 크래시-이어가기 로직이 발동하지 않게
     (jobs.JOBS_DIR / safe_id / "results.json").unlink(missing_ok=True)
-    st.update(state="queued", progress="", error=None)
+    st.update(state="queued", progress="", error=None, error_info=None)
     jobs.write_status(safe_id, st)
     worker.enqueue(safe_id)
     return {"ok": True}
