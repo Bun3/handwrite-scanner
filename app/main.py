@@ -247,6 +247,12 @@ async def input_create(files: list[UploadFile]):
     return await run_in_threadpool(intake.create, pairs)
 
 
+@app.get('/api/intake/{token}')
+def input_describe(token: str):
+    from app import intake
+    return intake.describe(token)
+
+
 @app.get('/api/intake/{token}/files/{file_index}/pages/{page}')
 def input_preview(token: str, file_index: int, page: int):
     from app import intake

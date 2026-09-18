@@ -73,11 +73,13 @@ def test_intake_preview_and_start_are_idempotent(isolated):
     draft = r.json()
     assert draft['files'][0]['pages'] == 4
     token = draft['token']
+    assert isolated.get(f'/api/intake/{token}').json() == draft
     preview = isolated.get(f'/api/intake/{token}/files/0/pages/2')
     assert preview.status_code == 200
     assert Image.open(io.BytesIO(preview.content)).width <= 600
     payload = {'templates': ['a', 'b'], 'pages': [[2, 4]]}
     first = isolated.post(f'/api/intake/{token}/start', json=payload)
+    assert isolated.get(f'/api/intake/{token}').json()['job_id'] == first.json()['id']
     assert first.status_code == 200, first.text
     assert isolated.post(f'/api/intake/{token}/start', json=payload).json() == first.json()
     assert len(jobs.list_jobs()) == 1

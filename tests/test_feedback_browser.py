@@ -220,7 +220,7 @@ def test_search_survives_review_and_return_to_jobs(screen):
     page.locator('#sf button').click()
     pw.expect(page.locator('#sr')).to_contain_text('홍길동')
     page.locator('#sr a').click()
-    page.wait_for_url('**/review.html?id=found')
+    page.wait_for_url('**/review.html?id=found&page=2')
     page.get_by_role('link', name='작업', exact=True).click()
     pw.expect(page.locator('#sq')).to_have_value('홍길동')
     pw.expect(page.locator('#sr')).to_contain_text('홍길동')

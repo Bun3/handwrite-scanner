@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="app.css">
 <script src="theme.js"></script>
 <script src="feedback.js"></script>
+<script src="view-state.js"></script>
 </head>
 <body>
 <header><b>handwrite-scanner</b>
@@ -51,6 +52,7 @@
   <button class="secondary" onclick="exportFile()">표 내보내기</button>
 </div>
 </main>
+<script src="review-state.js"></script>
 <script>
 const id = new URLSearchParams(location.search).get('id');
 document.getElementById('title').textContent = '검수 — ' + id;
@@ -151,6 +153,7 @@ async function load() {
     if (filterValue() || pageFilter().field) applyFilter();
     if (sortKeys().length) sortPages();
   }
+  restoreReviewState();
 }
 
 const filterValue = () => document.getElementById('fieldFilter').value;      // 표시 필드
@@ -247,6 +250,7 @@ function sortPages() {
     return a.dataset.page - b.dataset.page;   // 전 키 동률 → 페이지 순
   });
   pages.forEach(p => list.appendChild(p));
+  saveReviewState();
 }
 
 function applyFilter() {
@@ -271,6 +275,7 @@ function applyFilter() {
     // 표시 필드로 좁힌 동안엔 페이지 경고 숨김, 문서 필터는 숨긴 문서 것만 숨김
     w.style.display = (disp || (pages && !pages.has(w.dataset.page))) ? 'none' : '';
   });
+  saveReviewState();
 }
 
 function confClass(c) {

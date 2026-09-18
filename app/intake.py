@@ -104,6 +104,12 @@ def preview(token, file_index, page):
             return buf.getvalue()
 
 
+def describe(token):
+    """화면 복귀 시 원본을 재업로드하지 않고 유효한 임시 입력을 확인한다."""
+    with _lock:
+        return _read(token)
+
+
 def start(token, names, selections):
     with _lock:
         draft = _read(token)

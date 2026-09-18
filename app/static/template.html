@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="app.css">
 <script src="theme.js"></script>
 <script src="feedback.js"></script>
+<script src="view-state.js"></script>
 </head>
 <body>
 <header><b>handwrite-scanner</b>
@@ -32,11 +33,14 @@
   <h3>검증 규칙 <span class="hint" style="font-weight:400">(선택 — 줄바꿈 구분, 필드 라벨을 변수로 쓰는 산술·비교식.
     예: <code>종료시간 >= 시작시간</code>. <code>라벨 = 식</code> 형태는 빈 값을 식으로 채우고, 값이 있으면 등식을 검증합니다)</span></h3>
   <textarea id="rules" rows="2" style="width:100%" placeholder="위반 시 관련 필드가 검수에서 강조됩니다"></textarea>
-  <br><br><button onclick="saveTpl()">저장</button> <span id="saved" class="hint"></span>
+  <br><br><button onclick="saveTpl()">저장</button>
+  <button class="secondary" id="discardDraft" onclick="discardTemplateDraft()" hidden>임시 변경 버리기</button>
+  <span id="saved" class="hint"></span>
 </div>
 </main>
 <script>
 let name = '', fields = [], img = new Image(), scale = 1, drag = null;
+let templateBaseline = '', templateReady = false, draftStored = true;
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
 async function j(u, o) { const r = await apiFetch(u, o); return r.json(); }
@@ -48,11 +52,47 @@ async function loadList() {
   const sel = document.getElementById('tplSel');
   sel.length = 1;
   for (const t of await j('/api/templates')) sel.add(new Option(t.name, t.name));
-  const q = new URLSearchParams(location.search).get('name');
-  if (q) { sel.value = q; openTpl(q); }
+  const q = new URLSearchParams(location.search).get('name') || viewState.read('templateLast');
+  if (q && [...sel.options].some(o => o.value === q)) { sel.value = q; await openTpl(q); }
 }
 
-document.getElementById('tplSel').onchange = e => e.target.value && openTpl(e.target.value);
+document.getElementById('tplSel').onchange = e => {
+  if (e.target.value) openTpl(e.target.value);
+  else {
+    storeTemplateDraft();
+    if (!draftStored) { e.target.value = name; return; }
+    name = ''; templateReady = false;
+    viewState.remove('templateLast'); document.getElementById('editor').style.display = 'none';
+  }
+};
+
+function templateContents() {
+  return {fields, rules: document.getElementById('rules').value.split('\n').map(s => s.trim()).filter(Boolean)};
+}
+function storeTemplateDraft() {
+  if (!templateReady || !name) return;
+  const content = templateContents();
+  if (JSON.stringify(content) === templateBaseline) {
+    viewState.remove('templateDraft:' + name); draftStored = true;
+    document.getElementById('discardDraft').hidden = true; return;
+  }
+  document.getElementById('discardDraft').hidden = false;
+  draftStored = viewState.write('templateDraft:' + name, content);
+  document.getElementById('saved').textContent = draftStored ? '미저장 변경 · 이 탭에 임시 보관됨' : '미저장 변경 · 화면 이동 전 저장하세요';
+}
+document.getElementById('editor').addEventListener('input', storeTemplateDraft);
+document.getElementById('editor').addEventListener('change', storeTemplateDraft);
+window.addEventListener('pagehide', storeTemplateDraft);
+window.addEventListener('beforeunload', e => {
+  storeTemplateDraft();
+  if (!draftStored) { e.preventDefault(); e.returnValue = ''; }
+});
+
+function discardTemplateDraft() {
+  if (!confirm('미저장 변경을 버리고 마지막으로 저장한 양식으로 돌아갈까요?')) return;
+  viewState.remove('templateDraft:' + name); templateReady = false;
+  openTpl(name);
+}
 
 async function createTpl() {
   const n = document.getElementById('tplName').value.trim();
@@ -64,18 +104,31 @@ async function createTpl() {
 }
 
 async function openTpl(n) {
+  storeTemplateDraft();
+  if (!draftStored && templateReady) {
+    document.getElementById('tplSel').value = name;
+    notify('편집 내용을 임시 보관하지 못했습니다. 먼저 저장한 뒤 다른 양식을 선택하세요.'); return;
+  }
+  templateReady = false;
   name = n;
-  const tpls = await j('/api/templates');
-  const tpl = tpls.find(t => t.name === n) || {};
-  fields = tpl.fields || [];
-  document.getElementById('rules').value = (tpl.rules || []).join('\n');
+  viewState.write('templateLast', n);
   document.getElementById('editor').style.display = 'none';
+  const tpls = await j('/api/templates');
+  if (name !== n) return;
+  const tpl = tpls.find(t => t.name === n) || {};
+  templateBaseline = JSON.stringify({fields: tpl.fields || [], rules: tpl.rules || []});
+  const savedDraft = viewState.read('templateDraft:' + n);
+  const draft = Array.isArray(savedDraft?.fields) && Array.isArray(savedDraft?.rules) ? savedDraft : null;
+  fields = draft ? draft.fields : (tpl.fields || []);
+  document.getElementById('rules').value = (draft ? draft.rules : (tpl.rules || [])).join('\n');
+  document.getElementById('saved').textContent = draft ? '미저장 편집 내용을 복원했습니다. 반영하려면 저장하세요.' : '';
   const loaded = await loadImage(`/api/templates/${encodeURIComponent(n)}/reference?` + Date.now());
   if (name !== n) return;
   img = loaded;
   scale = Math.min(1, 950 / img.width);
   cv.width = img.width * scale; cv.height = img.height * scale;
   document.getElementById('editor').style.display = '';
+  templateReady = true;
   draw(); renderFields();
 }
 
@@ -126,20 +179,20 @@ function renderFields() {
   fields.forEach((f, i) => {
     const tr = tb.insertRow();
     tr.innerHTML = `<td class="grab" title="드래그로 순서 변경">⠿</td>
-      <td><input value="${esc(f.label)}" onchange="fields[${i}].label=this.value;draw()"></td>
+      <td><input value="${esc(f.label)}" oninput="fields[${i}].label=this.value;draw()"></td>
       <td><select onchange="fields[${i}].type=this.value;renderFields()">${Object.entries(TYPES).map(([k, v]) =>
         `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select><br>
         <label class="hint" style="white-space:nowrap"><input type="checkbox" ${f.optional ? 'checked' : ''}
           onchange="fields[${i}].optional=this.checked"> 비어있어도 정상</label></td>
       <td><textarea rows="1" style="width:100%" placeholder="후보목록/동그라미 타입만"
-        onchange="fields[${i}].candidates=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc((f.candidates || []).join('\n'))}</textarea></td>
+        oninput="fields[${i}].candidates=this.value.split('\\n').map(s=>s.trim()).filter(Boolean)">${esc((f.candidates || []).join('\n'))}</textarea></td>
       <td><textarea rows="1" style="width:100%" placeholder="모델에게 줄 추가 설명"
-        onchange="fields[${i}].hint=this.value.trim()">${esc(f.hint || '')}</textarea>
+        oninput="fields[${i}].hint=this.value.trim()">${esc(f.hint || '')}</textarea>
         ${['number', 'time'].includes(f.type) ? `<div class="hint">범위:
           <input type="number" style="width:60px" value="${f.min ?? ''}" placeholder="min"
-            onchange="fields[${i}].min=this.value===''?undefined:+this.value">~
+            oninput="fields[${i}].min=this.value===''?undefined:+this.value">~
           <input type="number" style="width:60px" value="${f.max ?? ''}" placeholder="max"
-            onchange="fields[${i}].max=this.value===''?undefined:+this.value"></div>` : ''}</td>
+            oninput="fields[${i}].max=this.value===''?undefined:+this.value"></div>` : ''}</td>
       <td><button class="danger" onclick="fields.splice(${i},1);renderFields()">삭제</button></td>`;
     tr.querySelector('.grab').onmousedown = () => tr.draggable = true;
     tr.ondragstart = e => { dragIdx = i; e.dataTransfer.effectAllowed = 'move'; };
@@ -155,14 +208,17 @@ function renderFields() {
     };
   });
   draw();
+  storeTemplateDraft();
 }
 
 async function autoDetect() {
   if (fields.length && !confirm('기존 필드 목록을 감지 결과로 대체합니다. 계속할까요?')) return;
   const b = document.getElementById('adBtn');
+  const requestedName = name;
   b.disabled = true; b.textContent = '감지 중... (엔진 상태에 따라 수 분)';
   try {
     const r = await apiFetch('/api/templates/' + encodeURIComponent(name) + '/autodetect', { method: 'POST' });
+    if (name !== requestedName) return;
     if (!r.ok) { notify((await r.json()).detail || '감지 실패'); return; }
     fields = (await r.json()).fields;
     renderFields();
@@ -171,11 +227,16 @@ async function autoDetect() {
 
 async function saveTpl() {
   // 저장 시 candidates 타입인데 후보가 비면 text로 강등하지 않고 그대로 저장(엔진이 무시)
-  const rules = document.getElementById('rules').value.split('\n').map(s => s.trim()).filter(Boolean);
-  const r = await apiFetch('/api/templates/' + encodeURIComponent(name), {
+  const savingName = name, content = JSON.stringify(templateContents());
+  const r = await apiFetch('/api/templates/' + encodeURIComponent(savingName), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields, rules })
+    body: content
   });
+  if (JSON.stringify(viewState.read('templateDraft:' + savingName)) === content) viewState.remove('templateDraft:' + savingName);
+  if (name !== savingName) return;
+  templateBaseline = content;
+  if (JSON.stringify(templateContents()) !== content) { storeTemplateDraft(); return; }
+  document.getElementById('discardDraft').hidden = true; draftStored = true;
   document.getElementById('saved').textContent = r.ok
     ? '저장됨 ' + new Date().toLocaleTimeString()
     : '⚠ ' + (await r.json()).detail;
@@ -184,6 +245,7 @@ async function saveTpl() {
 async function delTpl() {
   if (!name || !confirm(name + ' 템플릿을 삭제할까요?')) return;
   await apiFetch('/api/templates/' + encodeURIComponent(name), { method: 'DELETE' });
+  viewState.remove('templateDraft:' + name); viewState.remove('templateLast'); templateReady = false;
   location.href = 'template.html';
 }
 
