@@ -104,7 +104,7 @@
     if (target.id === 'themeBtn' || target.getAttribute('onclick')?.startsWith('resumeJob(')) target.removeAttribute('title');
     if (withBadge) {
       const badge = document.createElement('button'); entry.badge = badge;
-      badge.type = 'button'; badge.className = 'help-trigger'; badge.textContent = 'ⓘ';
+      badge.type = 'button'; badge.className = 'help-trigger'; badge.textContent = 'i';
       badge.setAttribute('aria-label', label + ' 도움말'); badge.setAttribute('aria-describedby', tip.id); badge.setAttribute('aria-expanded', 'false');
       // 체크박스는 설명 버튼을 누를 때 선택되지 않도록 label 밖에 둔다.
       if (target.matches('th, legend, h3')) target.append(badge);
