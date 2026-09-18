@@ -113,8 +113,15 @@
       badge.setAttribute('aria-label', label + ' 도움말'); badge.setAttribute('aria-describedby', tip.id); badge.setAttribute('aria-expanded', 'false');
       // 체크박스는 설명 버튼을 누를 때 선택되지 않도록 label 밖에 둔다.
       if (target.matches('th, legend, h3')) target.append(badge);
-      else if (target.id === 'rules') target.previousElementSibling.append(badge);
-      else (target.closest('label') || target).after(badge);
+      else if (target.id === 'rules') {
+        const heading = target.previousElementSibling;
+        heading.insertBefore(badge, heading.querySelector('.hint'));
+      } else if (target.matches('button, select') && !target.closest('label') &&
+                 !/flex|grid/.test(getComputedStyle(target.parentElement).display)) {
+        // Keep an inline control and its help on the same line when space is tight.
+        const group = document.createElement('span'); group.className = 'help-control';
+        target.before(group); group.append(target, badge); entry.group = group;
+      } else (target.closest('label') || target).after(badge);
       badge.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); show(entry); });
     } else if (!target.matches('button, input, select, textarea, a')) target.tabIndex = 0;
     for (const node of [target, entry.badge].filter(Boolean)) {
@@ -130,7 +137,7 @@
     for (const [selector, label, text, badge] of rules) document.querySelectorAll(selector).forEach(target => attach(target, label, text, badge));
     if (active && (!active.target.isConnected || !active.target.getClientRects().length)) hide();
     // 동적 목록이 다시 그려지면 이전 도움말 노드도 정리한다.
-    for (const entry of entries) if (!entry.target.isConnected) { entry.tip.remove(); entry.badge?.remove(); entries.delete(entry); }
+    for (const entry of entries) if (!entry.target.isConnected) { entry.tip.remove(); entry.badge?.remove(); entry.group?.remove(); entries.delete(entry); }
   }
   new MutationObserver(records => {
     if (active && records.some(r => r.type === 'attributes' && r.target === active.target)) show(active);

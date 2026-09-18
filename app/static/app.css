@@ -89,7 +89,7 @@ h3 { letter-spacing: -.01em; }
 button {
   background: var(--accent); color: var(--on-accent); border: 1px solid transparent;
   border-radius: 7px; padding: 8px 16px; cursor: pointer; font-size: 14px;
-  font-family: inherit;
+  font-family: inherit; vertical-align: middle;
 }
 button:hover { filter: brightness(1.06); }
 button.secondary { background: transparent; color: var(--text); border-color: var(--line); }
@@ -99,8 +99,12 @@ button.danger:hover { background: var(--danger-soft); border-color: var(--danger
 button:disabled { opacity: .45; cursor: default; }
 input, select, textarea {
   border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px;
-  font-size: 14px; font-family: inherit; background: var(--surface); color: var(--text);
+  font-size: 14px; font-family: inherit; background: var(--surface); color: var(--text); vertical-align: middle;
 }
+label { vertical-align: middle; }
+label:has(> #expOnly), label:has(> #copyDuplicates) { display:inline-flex; align-items:center; gap:4px; }
+.help-control { display:inline-flex; align-items:center; vertical-align:middle; max-width:100%; }
+.help-control > button { min-width:0; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 ::placeholder { color: var(--muted); }
 table { width: 100%; border-collapse: collapse; }
