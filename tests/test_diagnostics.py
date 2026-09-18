@@ -92,3 +92,19 @@ def test_real_transport_no_redirect_and_receipt_validation(client, monkeypatch):
         lambda r: d.httpx.Response(302, headers={'location': 'https://evil.test'})), **kw))
     with pytest.raises(d.httpx.HTTPStatusError):
         d.send_report(report)
+
+
+def test_feedback_is_required_bounded_and_never_collects_diagnostics(client, monkeypatch):
+    def forbidden():
+        raise AssertionError('feedback must not inspect device or jobs')
+    monkeypatch.setattr(d.jobs, 'list_jobs', forbidden)
+    monkeypatch.setattr(d.platform, 'system', forbidden)
+    for description in ['', '   ', 'x' * 4001]:
+        assert client.post('/api/diagnostics/preview', json={'kind':'feedback', 'description':description}).status_code in (400,422)
+    response = client.post('/api/diagnostics/preview', json={'kind':'feedback', 'category':'suggestion', 'description':'Please add an option'})
+    assert response.status_code == 200
+    report = response.json()['report']
+    assert report['kind'] == 'feedback'
+    assert report['category'] == 'suggestion'
+    assert not {'system','jobs','events','model','error_code'} & report.keys()
+    assert client.post('/api/diagnostics/preview', json={'kind':'feedback', 'category':'invalid','description':'hello'}).status_code == 422

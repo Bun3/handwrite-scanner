@@ -67,3 +67,18 @@ test('R2 failure never triggers automatic retries',async()=>{
   assert.equal((await worker.fetch(request(payload()),env)).status,503);
   assert.equal(writes,1);assert.equal(env.reservations,1);
 });
+
+test('feedback uses the same limiter and quota; rejects empty or diagnostic attachments',async()=>{
+  const p={schema:1,kind:'feedback',category:'suggestion',report_id:crypto.randomUUID(),created_at:new Date().toISOString(),
+    app_version:'0.9.0',screen:'index',contact:'',description:'Please add an option'};
+  const env=environment();
+  assert.equal((await worker.fetch(request(p),env)).status,201);
+  assert.equal(env.reservations,1);
+  for(const bad of [{...p,description:'  '},{...p,description:'x'.repeat(4001)},{...p,system:{}},{...p,category:'invalid'}]){
+    assert.equal((await worker.fetch(request(bad),env)).status,400);
+  }
+  assert.equal(env.reservations,1);
+  env.IP_LIMIT.limit=async()=>({success:false});
+  assert.equal((await worker.fetch(request(p),env)).status,429);
+  assert.equal(env.writes.length,1);
+});

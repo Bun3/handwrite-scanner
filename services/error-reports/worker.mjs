@@ -10,6 +10,7 @@ function keys(o, allowed) {
     && Object.keys(o).every(k=>allowed.includes(k));
 }
 export function validReport(p) {
+  if(p?.kind==='feedback')return validFeedback(p);
   return keys(p,['schema','report_id','created_at','app_version','system','model','error_code','screen','jobs','job_progress','events','contact','description'])
     && p.schema===1 && typeof p.report_id==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(p.report_id)
     && text(p.created_at,40) && /^[0-9T:+.Z-]+$/.test(p.created_at) && Number.isFinite(Date.parse(p.created_at))
@@ -31,6 +32,15 @@ export function validReport(p) {
       && Array.isArray(e.frames) && e.frames.length<=8 && e.frames.every(f=>
         keys(f,['module','line']) && symbol(f.module) && Number.isInteger(f.line) && number(f.line)))
     && text(p.contact,200) && text(p.description,4000);
+}
+
+function validFeedback(p) {
+  return keys(p,['schema','kind','category','report_id','created_at','app_version','screen','contact','description'])
+    && p.schema===1 && ['suggestion','usability','other'].includes(p.category)
+    && typeof p.report_id==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(p.report_id)
+    && text(p.created_at,40) && /^[0-9T:+.Z-]+$/.test(p.created_at) && Number.isFinite(Date.parse(p.created_at))
+    && symbol(p.app_version) && ['index','template','review','transfer','unknown'].includes(p.screen)
+    && text(p.contact,200) && text(p.description,4000) && p.description.trim().length>0;
 }
 
 async function readBounded(request) {

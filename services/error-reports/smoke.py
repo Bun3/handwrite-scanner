@@ -1,17 +1,24 @@
 """Synthetic-only public endpoint smoke test. Never collects local diagnostics."""
 import json
 import uuid
+import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser()
+parser.add_argument('--feedback', action='store_true')
+options = parser.parse_args()
 endpoint = json.loads((ROOT / 'data/cloudflare-setup/deployment.json').read_text())['endpoint']
 report = dict(schema=1, report_id=str(uuid.uuid4()), created_at=datetime.now(timezone.utc).isoformat(),
               app_version='0.9.0', system=dict(os='Windows', release='synthetic', architecture='AMD64',
               cpu_threads=8, ram_gb=16, disk_free_gb=100, cpu='synthetic', os_build='synthetic'), model='synthetic', error_code='smoke_test',
               screen='unknown', jobs={}, job_progress=[{'state': 'error', 'phase': 'recognizing', 'page': 2, 'total_pages': 105}],
               events=[], contact='', description='Synthetic deployment verification; no user data.')
+if options.feedback:
+    report = {k: report[k] for k in ('schema', 'report_id', 'created_at', 'app_version', 'screen', 'contact', 'description')}
+    report.update(kind='feedback', category='suggestion')
 with httpx.Client(timeout=30) as client:
     health = client.get(endpoint.replace('/reports', '/health'))
     assert health.status_code == 200, health.status_code
@@ -27,7 +34,7 @@ with httpx.Client(timeout=30) as client:
     # Malformed requests exercise the limiter without creating additional objects.
     statuses = [client.post(endpoint, json={}).status_code for _ in range(6)]
     assert 429 in statuses, statuses
-result = {'receipt': report['report_id'], 'accepted': True, 'public_read_denied': True,
+result = {'receipt': report['report_id'], 'kind': report.get('kind', 'error'), 'accepted': True, 'public_read_denied': True,
           'invalid_rejected': True, 'oversized_rejected': True, 'rate_limited': True}
 (ROOT / 'data/cloudflare-setup/smoke.json').write_text(json.dumps(result, indent=2))
 print(json.dumps(result))

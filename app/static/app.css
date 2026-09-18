@@ -200,6 +200,7 @@ summary { cursor: pointer; }
 .help-tooltip[hidden] { display:none; }
 #diagnosticDialog { width:min(700px, calc(100vw - 40px)); box-sizing:border-box; }
 #diagnosticDialog > label { display:block; margin:12px 0; }
+#diagnosticDialog > [hidden] { display:none; }
 #diagnosticContact, #diagnosticDescription { display:block; width:100%; box-sizing:border-box; margin-top:6px; }
 #diagnosticPreview { white-space:pre-wrap; overflow-wrap:anywhere; max-height:240px; overflow:auto; padding:12px; background:var(--bg); font-size:12px; }
 .diagnostic-actions { display:flex; gap:8px; flex-wrap:wrap; position:sticky; bottom:-20px;

@@ -13,6 +13,7 @@ import uuid
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -80,6 +81,8 @@ def record_error(exc, code, source):
 
 
 class Preview(BaseModel):
+    kind: Literal['error', 'feedback'] = 'error'
+    category: Literal['suggestion', 'usability', 'other'] = 'suggestion'
     code: str = Field(default='unexpected', max_length=80)
     screen: str = Field(default='unknown', max_length=30)
     contact: str = Field(default='', max_length=200)
@@ -100,6 +103,13 @@ def _local(request):
 
 
 def build_report(data):
+    if data.kind == 'feedback':
+        if not data.description.strip():
+            raise HTTPException(400, '보낼 의견을 입력해 주세요.')
+        return dict(schema=1, kind='feedback', category=data.category,
+                    report_id=str(uuid.uuid4()), created_at=_now(), app_version=config.VERSION,
+                    screen=data.screen if data.screen in ('index', 'template', 'review', 'transfer') else 'unknown',
+                    contact=data.contact, description=data.description)
     system = dict(os=platform.system(), release=platform.release(),
                   architecture=platform.machine(), cpu_threads=os.cpu_count(),
                   cpu=platform.processor()[:120], os_build=platform.version()[:120])
@@ -191,7 +201,7 @@ def submit(data: Submission, request: Request):
             draft['receipt'] = receipt
         return {'receipt': receipt}
     except Exception:
-        raise HTTPException(503, '오류 보고를 전송하지 못했습니다. 접수 한도 또는 연결 문제일 수 있습니다. 보고서를 파일로 저장해 전달해 주세요.') from None
+        raise HTTPException(503, '전송하지 못했습니다. 접수 한도 또는 연결 문제일 수 있습니다. 파일로 저장해 전달해 주세요.') from None
     finally:
         with _lock:
             draft['busy'] = False
