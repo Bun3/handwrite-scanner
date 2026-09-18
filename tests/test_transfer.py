@@ -217,6 +217,10 @@ def test_api_export_preview_import_roundtrip(pcs):
     r = client.post('/api/transfer/export', json={'jobs': [jid], 'templates': ['form']})
     assert r.status_code == 200, r.text
     archive = client.get(r.json()['url']).content
+    named = client.get(r.json()['url'], params={'filename': 'custom.hscan'})
+    assert named.content == archive
+    assert 'custom.hscan' in named.headers['content-disposition']
+    assert client.get(r.json()['url'], params={'filename': '../bad.hscan'}).status_code == 400
     pcs('b')
     preview = client.post('/api/transfer/preview', files={'file': ('work.hscan', archive)})
     assert preview.status_code == 200, preview.text

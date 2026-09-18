@@ -4,6 +4,7 @@ const request = async (url, body) => (await apiFetch(url, body === undefined ? u
 })).json();
 let exportSelection = null, imported = null, mergeIndex = null, mergePlan = null;
 let busy = false;
+let destination = null;
 const selected = id => [...el(id).querySelectorAll('input:checked')].map(i => i.value);
 function textNode(tag, text, className) {
   const node = document.createElement(tag); node.textContent = text;
@@ -18,7 +19,7 @@ function choice(container, value, text, checked = false) {
 async function operation(statusId, action) {
   if (busy) return;
   busy = true;
-  const buttons = [...document.querySelectorAll('.transfer-dialog button, #openExport')];
+  const buttons = [...document.querySelectorAll('.transfer-dialog button, #openExport')].filter(b => !b.closest('#unsavedDialog'));
   const previous = buttons.map(b => b.disabled); buttons.forEach(b => b.disabled = true);
   try { await action(); }
   catch (error) { el(statusId).textContent = error.message; }
@@ -53,8 +54,66 @@ el('openExport').onclick = () => operation('transferStatus', async () => {
   if (!jobs.length) el('exportJobs').textContent = '등록된 작업이 없습니다.';
   if (!templates.length) el('exportTemplates').textContent = '등록된 템플릿이 없습니다.';
   el('exportMode').value = 'full'; el('splitOptions').hidden = true; el('exportStatus').textContent = '';
+  destination = null;
+  el('chooseDestination').hidden = !window.showSaveFilePicker;
+  el('exportDestination').textContent = window.showSaveFilePicker ? '저장 위치 선택에서 폴더와 파일 이름을 지정하세요.' : '이 브라우저는 저장 위치 선택을 지원하지 않습니다. 브라우저 다운로드 설정에서 ‘저장 위치를 매번 확인’을 켜면 폴더를 선택할 수 있습니다.';
   el('exportDialog').showModal();
 });
+function exportFilename() {
+  let name = el('exportFilename').value.trim();
+  if (!name || /[\\/:*?"<>|\x00-\x1f]/.test(name) || /[. ]$/.test(name)) throw new Error('폴더 경로 없이 올바른 파일 이름을 입력하세요.');
+  if (!name.toLowerCase().endsWith('.hscan')) name += '.hscan';
+  if (name.length > 180) throw new Error('파일 이름은 확장자를 포함해 180자 이내로 입력하세요.');
+  return name;
+}
+el('exportFilename').oninput = () => {
+  destination = null;
+  if (window.showSaveFilePicker) el('exportDestination').textContent = '파일 이름이 바뀌었습니다. 저장 위치를 다시 선택하세요.';
+};
+el('chooseDestination').onclick = () => operation('exportStatus', async () => {
+  try {
+    const handle = await window.showSaveFilePicker({suggestedName: exportFilename(), types: [{description: 'handwrite-scanner 자료', accept: {'application/octet-stream': ['.hscan']}}]});
+    destination = handle; el('exportFilename').value = handle.name;
+    el('exportDestination').textContent = `${handle.name} · 선택한 폴더에 저장합니다.`;
+    el('exportStatus').textContent = '';
+  } catch (error) { if (error.name !== 'AbortError') throw error; }
+});
+
+function pendingEdits(ids) {
+  const edits = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (!key.startsWith('view:templateDraft:') && !key.startsWith('view:reviewDraft:')) continue;
+    const value = JSON.parse(sessionStorage.getItem(key));
+    if (key.startsWith('view:templateDraft:')) edits.push({key, value, name: key.slice('view:templateDraft:'.length), template: true});
+    else if (ids.includes(value.job)) edits.push({key, value, name: `${value.job} · ${value.page + 1}페이지 · ${value.id}`});
+  }
+  return edits;
+}
+async function saveBeforeExport(ids) {
+  const edits = pendingEdits(ids);
+  if (!edits.length) return true;
+  el('unsavedItems').replaceChildren(...edits.map(e => textNode('li', `${e.template ? '템플릿: ' : '검수: '}${e.name}`)));
+  const answer = await new Promise(resolve => {
+    const dialog = el('unsavedDialog');
+    dialog.oncancel = e => { e.preventDefault(); dialog.close('cancel'); };
+    dialog.onclose = () => resolve(dialog.returnValue);
+    el('cancelUnsaved').onclick = () => dialog.close('cancel');
+    el('skipSaveExport').onclick = () => dialog.close('skip');
+    el('saveBeforeExport').onclick = () => dialog.close('save');
+    dialog.showModal();
+  });
+  if (answer === 'cancel') return false;
+  if (answer === 'save') {
+    for (const edit of edits) {
+      await apiFetch(edit.template ? '/api/templates/' + encodeURIComponent(edit.name) : `/api/jobs/${encodeURIComponent(edit.value.job)}/fields`, {
+        method: edit.template ? 'PUT' : 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(edit.value)
+      });
+      if (sessionStorage.getItem(edit.key) === JSON.stringify(edit.value)) sessionStorage.removeItem(edit.key);
+    }
+  }
+  return true;
+}
 el('exportMode').onchange = () => { el('splitOptions').hidden = el('exportMode').value !== 'split'; };
 el('exportJobs').onchange = () => { exportSelection = null; el('splitSummary').textContent = ''; };
 
@@ -105,12 +164,27 @@ el('runExport').onclick = () => operation('exportStatus', async () => {
     if (ids.length !== 1 || exportSelection?.job !== ids[0] || !exportSelection.pages.length) throw new Error('맡길 페이지를 먼저 선택하세요.');
     body.pages = exportSelection.pages;
   }
+  const filename = exportFilename();
+  if (window.showSaveFilePicker && !destination) throw new Error('저장 위치 선택 버튼으로 폴더와 파일 이름을 먼저 지정하세요.');
+  if (!await saveBeforeExport(ids)) return;
   await stopJobs(ids);
   el('exportStatus').textContent = '자료 파일을 만들고 있습니다. 원본이 많으면 시간이 걸릴 수 있습니다…';
   const result = await request('/api/transfer/export', body);
-  const a = textNode('a', '자료 파일 다시 다운로드'); a.href = result.url; a.download = result.filename;
-  el('transferResult').replaceChildren(a); a.click();
+  const a = textNode('a', '자료 파일 다시 다운로드'); a.href = result.url + '?filename=' + encodeURIComponent(filename); a.download = filename;
+  el('transferResult').replaceChildren(a);
+  if (destination) {
+    el('exportStatus').textContent = '선택한 파일에 저장하고 있습니다…';
+    try {
+      const response = await apiFetch(a.href);
+      const writable = await destination.createWritable();
+      await response.body.pipeTo(writable);
+    } catch (error) {
+      el('transferStatus').textContent = '자료 파일은 생성됐지만 선택한 위치에 저장하지 못했습니다. 아래 링크로 다시 다운로드하세요.' + (body.pages ? ' 분담한 페이지는 이미 이 PC에서 제외됐으므로 전달하지 않을 경우 분담을 해제하세요.' : '');
+      throw error;
+    }
+  } else a.click();
   el('transferStatus').textContent = body.pages ? '분담 파일을 만들었습니다. 맡긴 페이지는 이 PC에서 건너뜁니다. 전달하지 않았다면 분담 해제로 되돌릴 수 있습니다.' : '자료 파일을 만들었습니다. 다른 PC의 자료 이동 화면에서 불러오세요.';
+  if (destination) el('transferStatus').textContent += ` ${destination.name} 파일을 선택한 폴더에 저장했습니다.`;
   el('exportDialog').close();
 });
 

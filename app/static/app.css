@@ -192,3 +192,6 @@ summary { cursor: pointer; }
   .picker-tools { font-size: 13px; gap: 6px; }
   .picker-file-label { flex-basis: 100%; } .picker-footer { font-size: 13px; }
 }
+.transfer-help { position:relative; display:inline-block; }
+.transfer-help [role=tooltip] { display:none; position:absolute; z-index:10; left:0; bottom:100%; width:min(420px, 75vw); padding:12px; background:var(--bg); color:var(--text); border:1px solid var(--accent); border-radius:6px; box-shadow:0 4px 18px #0005; font-size:14px; line-height:1.6; }
+.transfer-help:hover [role=tooltip], .transfer-help:focus-within [role=tooltip] { display:block; }

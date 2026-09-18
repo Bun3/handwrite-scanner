@@ -55,6 +55,7 @@ def test_merge_requires_per_page_choice_and_keeps_both_inputs(screen):
 
 def test_export_split_uses_virtual_page_picker_and_correct_zero_based_pages(screen):
     page, state, url = screen
+    page.add_init_script('window.showSaveFilePicker = undefined')
     state['jobs'] = [{'id': 'original', 'state': 'cancelled', 'templates': ['form']}]
     posts = []
     page.route('**/api/transfer/jobs/original/pages', lambda r: r.fulfill(json={'job': 'original', 'pages': [
@@ -79,4 +80,125 @@ def test_export_split_uses_virtual_page_picker_and_correct_zero_based_pages(scre
     page.locator('#runExport').click()
     pw.expect(page.locator('#transferStatus')).to_contain_text('분담 파일을 만들었습니다')
     assert posts == [{'jobs': ['original'], 'templates': [], 'pages': [1, 2]}]
+    assert not state['errors']
+
+
+def prepare_export(screen, fail_save=False):
+    page, state, url = screen
+    events = []
+    page.add_init_script('window.showSaveFilePicker = undefined')
+    def save(r):
+        events.append('save')
+        r.fulfill(status=400 if fail_save else 200, json={'detail': 'save failed'})
+    page.route('**/api/templates/form', save)
+    def export(r):
+        events.append('export')
+        r.fulfill(json={'url': '/api/transfer/download/token', 'filename': 'data.hscan'})
+    page.route('**/api/transfer/export', export)
+    page.route('**/api/transfer/download/**', lambda r: r.fulfill(body=b'data'))
+    page.goto(url + '/transfer.html')
+    page.evaluate("sessionStorage.setItem('view:templateDraft:form', JSON.stringify({fields:[], rules:['changed']}))")
+    page.locator('#openExport').click()
+    page.locator('#exportTemplates input').check()
+    return page, state, events
+
+
+def test_export_saves_draft_before_building_bundle(screen):
+    page, state, events = prepare_export(screen)
+    page.locator('#runExport').click()
+    pw.expect(page.locator('#unsavedDialog')).to_be_visible()
+    assert events == []
+    page.locator('#saveBeforeExport').click()
+    pw.expect(page.locator('#transferStatus')).to_contain_text('자료 파일을 만들었습니다')
+    assert events == ['save', 'export']
+    assert page.evaluate("sessionStorage.getItem('view:templateDraft:form')") is None
+    assert not state['errors']
+
+
+def test_failed_draft_save_blocks_export_and_keeps_draft(screen):
+    page, state, events = prepare_export(screen, fail_save=True)
+    page.locator('#runExport').click()
+    page.locator('#saveBeforeExport').click()
+    pw.expect(page.locator('#exportStatus')).to_contain_text('save failed')
+    assert events == ['save']
+    assert page.evaluate("sessionStorage.getItem('view:templateDraft:form')") is not None
+
+
+def test_export_cancel_and_skip_do_not_save_draft(screen):
+    page, state, events = prepare_export(screen)
+    page.locator('#runExport').click()
+    page.locator('#cancelUnsaved').click()
+    assert events == []
+    page.locator('#runExport').click()
+    page.locator('#skipSaveExport').click()
+    pw.expect(page.locator('#transferStatus')).to_contain_text('자료 파일을 만들었습니다')
+    assert events == ['export']
+    assert page.evaluate("sessionStorage.getItem('view:templateDraft:form')") is not None
+
+
+def test_export_writes_to_selected_file_and_tooltip_is_accessible(screen):
+    page, state, url = screen
+    page.add_init_script('''window.savedChunks = []; window.showSaveFilePicker = async options => {
+      window.pickerOptions = options;
+      return {name:'chosen.hscan', createWritable:async () => new WritableStream({write(chunk){window.savedChunks.push([...chunk])}})};
+    }''')
+    page.route('**/api/transfer/export', lambda r: r.fulfill(json={'url':'/api/transfer/download/token', 'filename':'data.hscan'}))
+    page.route('**/api/transfer/download/**', lambda r: r.fulfill(body=b'bundle'))
+    page.goto(url + '/transfer.html')
+    page.locator('#openExport').click()
+    page.locator('#exportTemplates input').check()
+    page.locator('#exportFilename').fill('custom.hscan')
+    page.locator('#chooseDestination').click()
+    pw.expect(page.locator('#exportDestination')).to_contain_text('chosen.hscan')
+    page.locator('#runExport').click()
+    pw.expect(page.locator('#transferStatus')).to_contain_text('저장했습니다')
+    assert page.evaluate('window.pickerOptions.suggestedName') == 'custom.hscan'
+    assert page.evaluate('window.savedChunks.flat()') == list(b'bundle')
+    assert not state['errors']
+
+
+def test_review_pending_edit_is_saved_before_export(screen):
+    page, state, events = prepare_export(screen)
+    page.locator('#cancelExport').click()
+    state['jobs'] = [{'id': 'job', 'state': 'done'}]
+    page.evaluate("sessionStorage.removeItem('view:templateDraft:form'); sessionStorage.setItem('view:reviewDraft:job:0:f', JSON.stringify({job:'job',page:0,id:'f',value:'edited'}))")
+    def save(r):
+        assert r.request.post_data_json['value'] == 'edited'
+        events.append('review'); r.fulfill(json={})
+    page.route('**/api/jobs/job/fields', save)
+    page.locator('#openExport').click()
+    page.locator('#exportJobs input').check()
+    page.locator('#runExport').click()
+    page.locator('#saveBeforeExport').click()
+    pw.expect(page.locator('#transferStatus')).to_contain_text('자료 파일을 만들었습니다')
+    assert events == ['review', 'export']
+
+
+def test_duplicate_explanation_on_hover_and_keyboard_focus(screen):
+    page, state, url = screen
+    page.route('**/api/transfer/preview', lambda r: r.fulfill(json=preview()))
+    page.goto(url + '/transfer.html')
+    page.set_input_files('#importFile', {'name': 'data.hscan', 'mimeType': 'application/octet-stream', 'buffer': b'test'})
+    page.locator('#copyDuplicates').hover()
+    pw.expect(page.locator('#duplicateHelp')).to_be_visible()
+    pw.expect(page.locator('#duplicateHelp')).to_contain_text('새 작업 ID')
+    page.locator('#importTitle').hover()
+    page.locator('#copyDuplicates').focus()
+    pw.expect(page.locator('#duplicateHelp')).to_be_visible()
+
+
+def test_destination_write_failure_keeps_download_recovery(screen):
+    page, state, url = screen
+    page.add_init_script('''window.showSaveFilePicker = async () => ({name:'chosen.hscan',
+      createWritable:async () => {throw new Error('Permission denied')}})''')
+    page.route('**/api/transfer/export', lambda r: r.fulfill(json={'url':'/api/transfer/download/token', 'filename':'data.hscan'}))
+    page.route('**/api/transfer/download/**', lambda r: r.fulfill(body=b'bundle'))
+    page.goto(url + '/transfer.html')
+    page.locator('#openExport').click()
+    page.locator('#exportTemplates input').check()
+    page.locator('#chooseDestination').click()
+    page.locator('#runExport').click()
+    pw.expect(page.locator('#exportStatus')).to_contain_text('Permission denied')
+    pw.expect(page.locator('#transferStatus')).to_contain_text('저장하지 못했습니다')
+    pw.expect(page.locator('#transferResult a')).to_have_attribute('href', '/api/transfer/download/token?filename=chosen.hscan')
     assert not state['errors']

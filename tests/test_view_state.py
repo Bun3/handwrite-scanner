@@ -90,6 +90,25 @@ def test_template_draft_survives_failed_save_and_can_be_discarded(screen):
     assert not state['errors']
 
 
+def test_review_failed_save_survives_navigation_and_can_retry(screen):
+    page, state, url = screen
+    setup_documents(page)
+    page.route('**/api/jobs/found/fields', lambda r: r.fulfill(status=500, json={'detail': 'Save failed'}))
+    page.goto(url + '/review.html?id=found')
+    page.locator('.field-row input').first.fill('Unsaved correction')
+    page.locator('#title').click()
+    pw.expect(page.locator('#notifications')).to_contain_text('Save failed')
+    page.reload()
+    pw.expect(page.locator('.field-row input').first).to_have_value('Unsaved correction')
+    pw.expect(page.locator('.field-row .conf').first).to_have_text('미저장')
+    page.route('**/api/jobs/found/fields', lambda r: r.fulfill(json={}))
+    page.locator('.field-row input').first.fill('Retried')
+    page.locator('#title').click()
+    pw.expect(page.locator('.field-row .conf').first).to_have_text('100%')
+    assert page.evaluate("sessionStorage.getItem('view:reviewDraft:found:0:f1')") is None
+    assert not state['errors']
+
+
 def test_restored_intake_already_started_is_not_shown_as_new_input(screen):
     page, state, url = screen
     page.goto(url)

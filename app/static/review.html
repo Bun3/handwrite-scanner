@@ -109,12 +109,23 @@ async function load() {
         row.appendChild(c);
       }
       const inp = document.createElement('input');
-      inp.value = f.value || '';
+      const draftKey = `reviewDraft:${encodeURIComponent(id)}:${page.page}:${encodeURIComponent(f.id)}`;
+      const draft = viewState.read(draftKey);
+      inp.value = draft?.value ?? f.value ?? '';
+      row.dataset.value = inp.value;
       inp.title = 'LLM 원문: ' + (f.raw || '');
+      inp.oninput = () => {
+        viewState.write(draftKey, {job: id, page: page.page, id: f.id, value: inp.value});
+        conf.textContent = '미저장';
+      };
       inp.onchange = async () => {
+        const value = inp.value;
+        inp.oninput();
         const r = await (await apiFetch(`/api/jobs/${id}/fields`, { method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ page: page.page, id: f.id, value: inp.value }) })).json();
+          body: JSON.stringify({ page: page.page, id: f.id, value }) })).json();
+        if (viewState.read(draftKey)?.value === value) viewState.remove(draftKey);
+        if (inp.value !== value) return;
         row.className = 'field-row c-green';   // 사람이 확인한 값 = 100%
         row.dataset.value = inp.value;         // 값 필터가 수정된 값을 반영하도록
         label.textContent = f.label;
@@ -137,7 +148,7 @@ async function load() {
       row.appendChild(inp);
       const conf = document.createElement('span');
       conf.className = 'conf hint';
-      conf.textContent = (f.confidence * 100).toFixed(0) + '%';
+      conf.textContent = draft ? '미저장' : (f.confidence * 100).toFixed(0) + '%';
       row.appendChild(conf);
       if (!f.value && f.confidence <= 0.5) {  // 모델이 빈칸/무표시라 답함 — 사람이 판단
         const note = document.createElement('span');

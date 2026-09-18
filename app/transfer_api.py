@@ -18,11 +18,13 @@ def export(body: dict):
 
 
 @router.get('/download/{token}')
-def download(token: str):
+def download(token: str, filename: str = 'handwrite-data.hscan'):
     require(re.fullmatch(r'[a-f0-9]{32}', token))
+    require(1 <= len(filename) <= 180 and not re.search(r'[\\/:*?"<>|\x00-\x1f]', filename)
+            and filename.lower().endswith('.hscan'), '올바른 자료 파일 이름을 입력하세요.')
     path = transfer.root() / (token + '.hscan')
     require(path.is_file(), '내보낸 자료가 만료되었습니다. 다시 내보내세요.')
-    return FileResponse(path, filename='handwrite-data.hscan', media_type='application/octet-stream')
+    return FileResponse(path, filename=filename, media_type='application/octet-stream')
 
 
 @router.post('/preview')

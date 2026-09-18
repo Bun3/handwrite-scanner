@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>자료 이동 - handwrite-scanner</title>
 <link rel="icon" href="data:,"><link rel="stylesheet" href="app.css">
-<script src="theme.js"></script><script src="feedback.js"></script>
+<script src="theme.js"></script><script src="feedback.js"></script><script src="view-state.js"></script>
 </head>
 <body class="transfer-page">
 <header><b>handwrite-scanner</b><a href="/">작업</a><a href="template.html">템플릿</a><a class="on" href="transfer.html">자료 이동</a>
@@ -25,11 +25,16 @@
 </main>
 <dialog id="exportDialog" class="transfer-dialog" aria-labelledby="exportTitle">
 <h3 id="exportTitle">자료 내보내기</h3>
-<p class="hint">템플릿 화면의 미저장 편집은 포함되지 않습니다. 필요한 변경은 먼저 저장하세요.</p>
+<p class="hint">이 탭에서 편집한 미저장 내용이 있으면 내보내기 전에 저장 여부를 확인합니다.</p>
 <fieldset><legend>템플릿</legend><div id="exportTemplates" class="transfer-items"></div></fieldset>
 <fieldset><legend>작업</legend><div id="exportJobs" class="transfer-items"></div></fieldset>
 <label>내보내기 방식 <select id="exportMode"><option value="full">작업 전체 이동 / 결과 돌려보내기</option><option value="split">페이지 분담 (작업 하나)</option></select></label>
 <div id="splitOptions" hidden><button id="chooseSplit" class="secondary">맡길 페이지 선택</button> <span id="splitSummary"></span></div>
+<fieldset><legend>파일 저장</legend>
+<label>파일 이름 <input id="exportFilename" value="handwrite-data.hscan" autocomplete="off"></label>
+<button id="chooseDestination" class="secondary">저장 위치 선택</button>
+<p id="exportDestination" class="hint" role="status"></p>
+</fieldset>
 <p class="hint">중단한 페이지는 처음부터 다시 처리합니다. 완료된 인식·검수 결과는 유지됩니다. 기존 작업은 현재 등록된 양식이 포함될 수 있습니다.</p>
 <p id="exportStatus" role="status"></p>
 <div class="transfer-actions"><button id="cancelExport" class="secondary">취소</button><button id="runExport">파일 만들기</button></div>
@@ -39,7 +44,8 @@
 <p class="hint">가져온 작업은 자동으로 시작하지 않습니다. 작업에 필요한 양식은 전용 사본으로 보관됩니다.</p>
 <fieldset><legend>템플릿 목록에도 추가하기</legend><div id="importTemplates" class="transfer-items"></div></fieldset>
 <fieldset><legend>작업</legend><div id="importJobs" class="transfer-items"></div></fieldset>
-<label><input type="checkbox" id="copyDuplicates">이미 가져온 작업도 별도 사본으로 추가</label>
+<span class="transfer-help"><label><input type="checkbox" id="copyDuplicates" aria-describedby="duplicateHelp">이미 가져온 작업도 별도 사본으로 추가 ⓘ</label>
+<span id="duplicateHelp" role="tooltip">같은 자료 파일의 작업을 이미 가져왔다면 기본적으로 중복 작업은 건너뜁니다. 이 옵션을 켜고 해당 작업을 선택하면 새 작업 ID로 사본을 하나 더 만듭니다. 기존 작업과 검수 내용은 덮어쓰거나 합치지 않습니다. 결과를 합치려면 ‘기존 작업과 합치기’를 사용하세요.</span></span>
 <p id="importStatus" role="status"></p>
 <div class="transfer-actions"><button id="cancelImport" class="secondary">닫기</button><button id="runImport">선택한 자료 가져오기</button></div>
 </dialog>
@@ -49,6 +55,13 @@
 <p>두 원본 작업은 보존하고 새 통합 작업을 만듭니다. 서로 다른 결과가 있는 페이지는 아래에서 선택하세요.</p>
 <p id="mergeSummary" role="status"></p><div id="mergeConflicts"></div>
 <div class="transfer-actions"><button id="cancelMerge" class="secondary">취소</button><button id="runMerge" disabled>새 통합 작업 만들기</button></div>
+</dialog>
+<dialog id="unsavedDialog" class="transfer-dialog" aria-labelledby="unsavedTitle">
+<h3 id="unsavedTitle">저장하지 않은 변경 사항이 있습니다</h3>
+<ul id="unsavedItems"></ul>
+<p>변경 사항을 저장한 뒤 내보낼까요? 저장된 내용만 내보내면 미저장 편집은 이 탭에 남습니다.</p>
+<p class="hint">템플릿을 저장해도 기존 작업에 보관된 당시 양식 사본은 바뀌지 않습니다. 새 양식을 함께 전달하려면 내보낼 템플릿에도 선택하세요.</p>
+<div class="transfer-actions"><button id="cancelUnsaved" class="secondary">취소</button><button id="skipSaveExport" class="secondary">저장된 내용만 내보내기</button><button id="saveBeforeExport">저장 후 내보내기</button></div>
 </dialog>
 <script src="page-picker.js"></script><script src="transfer.js"></script>
 </body></html>
