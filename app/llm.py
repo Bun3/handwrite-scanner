@@ -8,11 +8,13 @@ from contextvars import ContextVar
 import httpx
 
 from app import config
-from app.errors import UserError
+from app.errors import UserError, explain
 
 _URL = f"http://127.0.0.1:{config.LLAMA_PORT}"
 _proc = None
 _start_lock = threading.Lock()
+_engine_state = 'idle'
+_engine_error = None
 progress_reporter = ContextVar('engine_progress', default=lambda phase: None)
 
 
@@ -33,12 +35,38 @@ def is_up() -> bool:
         return False
 
 
-def ensure_server(timeout: int = 300) -> None:
+def status() -> dict:
+    """A failed health probe alone does not mean the engine is loading."""
+    global _engine_state, _engine_error
     if is_up():
+        _engine_state, _engine_error = 'ready', None
+        return {'state': 'ready'}
+    if _engine_state == 'loading':
+        return {'state': 'loading'}
+    if _engine_error:
+        return {'state': 'error', 'error': dict(_engine_error)}
+    if _proc is not None or _engine_state == 'ready':
+        return {'state': 'error', 'error': {
+            'code': 'engine_connection', 'message': '인식 엔진이 응답하지 않습니다.',
+            'action': '작업 목록의 진행 상태를 확인하세요. 오류로 끝난 작업은 이어하기로 다시 시도할 수 있습니다.'}}
+    return {'state': 'idle'}
+
+
+def ensure_server(timeout: int = 300) -> None:
+    global _engine_state, _engine_error
+    if is_up():
+        _engine_state, _engine_error = 'ready', None
         return
     progress_reporter.get()('engine_loading')
     with _start_lock:
-        _ensure_server(timeout)
+        _engine_state, _engine_error = 'loading', None
+        try:
+            _ensure_server(timeout)
+        except Exception as exc:
+            _engine_state, _engine_error = 'error', explain(exc)
+            raise
+        else:
+            _engine_state = 'ready'
     progress_reporter.get()('recognizing')
 
 
@@ -81,13 +109,14 @@ def _ensure_server(timeout: int = 300) -> None:
 
 def restart() -> None:
     """모델 교체 등으로 llama-server 재기동이 필요할 때. 다음 호출 시 새로 뜬다."""
-    global _proc
+    global _proc, _engine_state, _engine_error
     if _proc is not None and _proc.poll() is None:
         _proc.kill()
     else:  # 다른 프로세스(이전 실행)가 띄운 서버까지 정리
         subprocess.run(["taskkill", "/IM", "llama-server.exe", "/F"],
                        capture_output=True)
     _proc = None
+    _engine_state, _engine_error = 'idle', None
 
 
 def ask_image(image_bytes: bytes, prompt: str, timeout: float = 600) -> str:

@@ -1,6 +1,7 @@
 /* 공통 도움말: 동적으로 생성된 화면도 hover, focus, 별도 터치 버튼으로 설명한다. */
 (() => {
   const rules = [
+    ['#llm', '인식 엔진 상태', '상태 안내\n대기: 인식 시작 시 자동 실행\n준비 중: 모델을 메모리에 불러오는 중\n준비됨: 엔진 응답 정상\n인식 중: 문서를 처리하는 중\n확인 필요: 시작 실패 또는 엔진 응답 이상\n연결 확인 필요: 프로그램 서버에 연결하지 못함\n\n문서 업로드·변환·양식 확인 상태는 작업 목록에서 별도로 확인하세요. 모델 선택과 다운로드는 아래 인식 모델에서 관리합니다.'],
     ['#themeBtn', '화면 테마', '밝은 화면과 어두운 화면을 전환합니다. 선택한 테마는 이 브라우저에 저장됩니다.', false],
     ['#submitJob', '인식 시작', '선택한 양식과 페이지만 검사합니다. 양식과 맞지 않는 문서는 건너뜁니다. 접수 후 문서와 엔진 준비에 시간이 걸릴 수 있습니다.'],
     ['#sq', '문서 검색', '파일 이름이 아니라 인식·검수된 필드 값에서 검색합니다. 결과의 문서 열기로 해당 페이지를 확인할 수 있습니다.'],
@@ -66,7 +67,11 @@
   }
   function show(entry) {
     clearTimeout(timer);
-    if (active === entry) return;
+    if (entry.target.dataset.helpText) {
+      entry.tip.textContent = entry.target.dataset.helpText + '\n\n' + entry.text;
+      entry.tip.style.whiteSpace = 'pre-line';
+    }
+    if (active === entry) { position(entry); return; }
     hide(); active = entry;
     const {tip, target, badge} = entry;
     tip.hidden = false;
@@ -97,7 +102,7 @@
     tip.className = 'help-tooltip'; tip.setAttribute('role', 'tooltip'); tip.setAttribute('popover', 'manual');
     if (!tip.showPopover) tip.removeAttribute('popover');
     tip.hidden = true; tip.textContent = text; (target.closest('dialog') || document.body).append(tip);
-    const entry = {target, tip, badge: null}; attached.set(target, entry); entries.add(entry);
+    const entry = {target, tip, text, badge: null}; attached.set(target, entry); entries.add(entry);
     const described = new Set((target.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
     described.add(tip.id); target.setAttribute('aria-describedby', [...described].join(' '));
     // 원문 표시 등 기존 보충 정보는 유지하고 같은 설명의 이중 표시만 피한다.
@@ -128,10 +133,11 @@
     for (const entry of entries) if (!entry.target.isConnected) { entry.tip.remove(); entry.badge?.remove(); entries.delete(entry); }
   }
   new MutationObserver(records => {
+    if (active && records.some(r => r.type === 'attributes' && r.target === active.target)) show(active);
     if (records.some(r => [...r.addedNodes, ...r.removedNodes].some(n => n.nodeType === 1 && !n.matches('.help-tooltip, .help-trigger')))) {
       if (!frame) frame = requestAnimationFrame(scan);
     }
-  }).observe(document.body, {childList: true, subtree: true});
+  }).observe(document.body, {childList: true, subtree: true, attributes:true, attributeFilter:['data-help-text']});
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && active) { hide(); e.preventDefault(); e.stopImmediatePropagation(); } }, true);
   document.addEventListener('pointerdown', e => { if (active && ![active.target, active.badge, active.tip].some(n => n?.contains(e.target))) hide(); }, true);
   document.addEventListener('click', e => { if (!e.target.closest('.help-trigger, .help-tooltip')) hide(); }, true);

@@ -14,7 +14,6 @@
 <body>
 <header><b>handwrite-scanner</b>
   <a class="on" href="/">작업</a><a href="template.html">템플릿</a>
-  <span id="llm" class="hint"></span>
   <a href="transfer.html">자료 이동</a>
   <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="라이트/다크 전환">☾</button>
 </header>
@@ -35,7 +34,10 @@
     <input type="file" name="files" multiple accept="image/*,.pdf" required>
     <p class="hint">선택한 양식과 맞지 않는 처방전·증빙 문서 등은 건너뜁니다. 파일을 선택하면 페이지를 미리 보고 검사 대상을 고를 수 있습니다.</p>
     <div id="pageSelection"></div>
-    <button id="submitJob">인식 시작</button>
+    <div class="recognition-actions">
+      <span class="recognition-start"><button id="submitJob">인식 시작</button></span>
+      <span class="engine-status"><span id="llm" class="hint" role="status" aria-live="polite">엔진 · 확인 중</span></span>
+    </div>
   </form>
   <p id="uploadStatus" role="status" aria-live="polite" class="hint"></p>
   <p class="hint">CPU에서 문서 1장당 몇 분 걸립니다. 여러 장을 걸어두고 나중에 검수하세요.</p>
@@ -221,8 +223,28 @@ document.getElementById('up').onsubmit = async e => {
 };
 
 async function health() {
-  const h = await j('/api/health');
-  document.getElementById('llm').textContent = h.llm ? '엔진: 준비됨' : '엔진: 대기 · 인식 시 자동 준비';
+  const label = document.getElementById('llm');
+  try {
+    const response = await fetch('/api/health', {signal: AbortSignal.timeout(5000)});
+    if (!response.ok) throw new Error('health failed');
+    const h = await response.json();
+    const state = h.engine?.state || (h.llm ? 'ready' : 'idle');
+    const recognizing = state === 'ready' && cachedJobs.some(s => s.state === 'running' && s.phase === 'recognizing');
+    const key = recognizing ? 'recognizing' : state;
+    const states = {
+      idle: ['대기', '엔진을 아직 실행하지 않았습니다. 인식 시작이나 이어하기 시 선택된 모델을 자동으로 불러옵니다.'],
+      loading: ['준비 중', '선택한 모델을 메모리에 불러오고 있습니다. PC 성능에 따라 수 분 걸릴 수 있으며, 작업 목록에서 진행 상태를 확인할 수 있습니다.'],
+      ready: ['준비됨', '인식 엔진이 정상 응답하고 있습니다. 작업이 접수되면 인식을 진행할 수 있습니다.'],
+      recognizing: ['인식 중', '준비된 엔진으로 문서를 처리하고 있습니다. 페이지별 진행 상황은 작업 목록에서 확인하세요.'],
+      error: ['확인 필요', [h.engine?.error?.message, h.engine?.error?.action].filter(Boolean).join(' ') || '엔진 상태를 확인할 수 없습니다. 작업 목록의 오류 안내를 확인하세요.']
+    };
+    const [text, description] = states[key] || ['확인 중', '프로그램과 엔진 상태를 확인하고 있습니다.'];
+    label.textContent = `엔진 · ${text}`; label.dataset.state = key;
+    label.dataset.helpText = description;
+  } catch {
+    label.textContent = '엔진 · 연결 확인 필요'; label.dataset.state = 'offline';
+    label.dataset.helpText = '프로그램 서버의 상태를 가져오지 못했습니다. 프로그램이 실행 중인지 확인하세요. 엔진 자체의 오류로 확정된 상태는 아닙니다.';
+  }
 }
 
 let mdlTimer = null;

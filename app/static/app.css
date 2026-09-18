@@ -141,6 +141,11 @@ details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px;
 summary { cursor: pointer; }
 
 #up { display: block; }
+.recognition-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px; }
+.recognition-start, .engine-status { display:inline-flex; align-items:center; gap:4px; }
+.engine-status { padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
+#llm[data-state="loading"], #llm[data-state="recognizing"] { color:var(--accent); }
+#llm[data-state="error"], #llm[data-state="offline"] { color:var(--danger); }
 #up > input[type=file] { margin-bottom: 14px; }
 #templateChoices { display: flex; flex-wrap: wrap; gap: 12px; }
 #templateChoices label { display: inline-flex; align-items: center; gap: 4px; }
@@ -187,6 +192,9 @@ summary { cursor: pointer; }
 .picker-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; }
 .picker-footer > div { display: flex; gap: 8px; flex-shrink: 0; }
 @media (max-width: 640px) {
+  body > header { flex-wrap:wrap; gap:10px 14px; padding:12px 16px; }
+  body > header > b { flex-basis:100%; }
+  body > header > a, body > header > button { white-space:nowrap; flex-shrink:0; }
   #pagePicker { width: calc(100vw - 12px); height: calc(100dvh - 12px); }
   .picker-heading, .picker-tools, .picker-footer { padding-left: 12px; padding-right: 12px; }
   .picker-tools { font-size: 13px; gap: 6px; }

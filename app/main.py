@@ -87,7 +87,8 @@ def _startup():
 
 @app.get("/api/health")
 def health():
-    return {"app": "ok", "llm": llm.is_up(), "version": VERSION}
+    engine = llm.status()
+    return {"app": "ok", "llm": engine['state'] == 'ready', "engine": engine, "version": VERSION}
 
 
 @app.get("/api/update")
