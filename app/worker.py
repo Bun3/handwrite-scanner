@@ -6,7 +6,7 @@ import re
 import threading
 import traceback
 
-from app import jobs, llm, postprocess, templates_store
+from app import jobs, llm, postprocess, templates_store, job_context
 from app.align import HAVE_CV2, best_template, to_reference
 from app.errors import UserError, explain
 
@@ -55,13 +55,14 @@ def start() -> None:
 def _loop() -> None:
     while True:
         job_id = _q.get()
-        st = jobs.status(job_id)
-        if st is None or st["state"] != "queued":  # 삭제·중단되거나 이미 처리한 큐 항목
-            _cancel.discard(job_id)
-            continue
         try:
-            st["state"] = "running"
-            jobs.write_status(job_id, st)
+            with jobs._io_lock:
+                st = jobs.status(job_id)
+                if st is None or st["state"] != "queued":
+                    _cancel.discard(job_id)
+                    continue
+                st["state"] = "running"
+                jobs.write_status(job_id, st)
             def report_phase(phase):
                 st['phase'] = phase
                 jobs.write_status(job_id, st)
@@ -70,8 +71,8 @@ def _loop() -> None:
                 _process(job_id, st)
             finally:
                 llm.progress_reporter.reset(token)
-            st["state"] = "done"
-            st["progress"] = ""
+            st["state"] = "cancelled" if st.get('delegated_pages') else "done"
+            st["progress"] = '다른 PC에 분담한 페이지의 결과를 기다리고 있습니다.' if st.get('delegated_pages') else ''
         except _Cancelled:
             st["state"] = "cancelled"
             st["progress"] = ""
@@ -89,6 +90,11 @@ def _loop() -> None:
 
 
 def _process(job_id: str, st: dict) -> None:
+    stored = job_context.pool(job_id)
+    def get_template(name):
+        return templates_store.get(name) if stored is None else next((t for t, _ in stored if t['name'] == name), None)
+    def get_reference(name):
+        return templates_store.reference_path(name) if stored is None else next(r for t, r in stored if t['name'] == name)
     strict = 'templates' in st
     strict_pool = []
     if strict:
@@ -97,29 +103,32 @@ def _process(job_id: str, st: dict) -> None:
         if not HAVE_CV2:
             raise UserError('alignment_missing', '양식 판별 엔진을 사용할 수 없습니다.', '프로그램을 다시 설치한 뒤 이어하기를 누르세요.')
         for name in st['templates']:
-            tpl = templates_store.get(name)
+            tpl = get_template(name)
             if tpl is None:
                 raise UserError('template_missing', f'선택한 양식을 찾을 수 없습니다: {name}', '양식을 복원한 뒤 이어하기를 누르세요.')
-            strict_pool.append((tpl, templates_store.reference_path(name)))
-    tpl_fixed = templates_store.get(st["template"]) if st.get("template") else None
+            strict_pool.append((tpl, get_reference(name)))
+    tpl_fixed = get_template(st["template"]) if st.get("template") else None
     if st.get('template') and tpl_fixed is None:
         raise UserError('template_missing', f"선택한 템플릿을 찾을 수 없습니다: {st['template']}", '템플릿 폴더와 template.json을 복원하거나 같은 이름으로 템플릿을 등록한 뒤 이어하기를 누르세요.')
     if tpl_fixed:
-        templates_store.reference_path(tpl_fixed['name'])
+        get_reference(tpl_fixed['name'])
     jobs.prepare_inputs(job_id, st, lambda: _check_cancel(job_id))
     detect_pool = None
     if not tpl_fixed and not strict:  # 이전 작업의 자동 추출 방식은 이어하기에서도 유지
-        detect_pool = [(t, templates_store.reference_path(t["name"]))
-                       for t in templates_store.list_templates()]
+        detect_pool = stored if stored is not None else [(t, templates_store.reference_path(t["name"]))
+                                                        for t in templates_store.list_templates()]
     images = jobs.input_images(job_id)
     sources = jobs.page_sources(job_id)
     # 크래시 복구: 이전 실행이 완료한 페이지 프리픽스는 건너뛰고 이어간다.
     # (재인식 버튼은 results.json을 지우고 시작하므로 항상 처음부터)
     done = jobs.results(job_id) or []
-    results = done if all(p.get("page") == i for i, p in enumerate(done)) else []
+    if not job_context.valid_results(job_id, done):
+        raise UserError('results_invalid', '저장된 페이지 결과가 손상되었습니다.', '원본 작업을 확인하세요.')
+    results = done
+    completed = {p['page'] for p in done}
     job_dir = jobs.JOBS_DIR / job_id
     for page_no, img_path in enumerate(images):
-        if page_no < len(results):
+        if page_no in completed or page_no in st.get('delegated_pages', []):
             continue
         _check_cancel(job_id)
         st.update(phase='recognizing', progress=f'{page_no + 1}/{len(images)}페이지 · 양식 확인 중')
@@ -142,7 +151,7 @@ def _process(job_id: str, st: dict) -> None:
                 continue
         elif tpl_fixed:
             aligned, ok = to_reference(
-                data, templates_store.reference_path(tpl_fixed["name"]))
+                data, get_reference(tpl_fixed["name"]))
             if HAVE_CV2 and not ok:
                 # 지정 양식과 정합 실패 = 사이에 끼인 증빙 등 다른 서류 → 인식 생략
                 import shutil

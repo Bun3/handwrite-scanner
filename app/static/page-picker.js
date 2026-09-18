@@ -50,7 +50,7 @@ class PagePicker {
       try { localStorage.setItem('pagePickerColumns', this.el('pickerSize').value); } catch {}
       this.layout(position);
     };
-    this.el('pickerAll').onclick = () => { for (let n = 1; n <= this.file.pages; n++) this.current.add(n); this.syncChecks(); };
+    this.el('pickerAll').onclick = () => { for (let n = 1; n <= this.file.pages; n++) if (!this.file.disabled?.includes(n)) this.current.add(n); this.syncChecks(); };
     this.el('pickerNone').onclick = () => { this.current.clear(); this.syncChecks(); };
     this.scroll.onscroll = () => {
       if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.draw(); });
@@ -65,6 +65,8 @@ class PagePicker {
   open(draft, selection, catalog, templates, onApply) {
     if (this.dialog.open) return;
     this.draft = draft; this.selection = selection.map(s => new Set(s)); this.onApply = onApply;
+    this.dialog.querySelector('.picker-templates').hidden = !!draft.job;
+    this.el('pagePickerTitle').textContent = draft.job ? '다른 PC에 맡길 페이지 선택' : '검사할 페이지 선택';
     this.templates = new Set(templates);
     this.el('templateChoices').replaceChildren(...catalog.map(t => {
       const label = document.createElement('label'), check = document.createElement('input');
@@ -126,10 +128,12 @@ class PagePicker {
     const node = document.createElement('div'); node.className = 'page-choice';
     const label = document.createElement('label'), check = document.createElement('input');
     check.type = 'checkbox'; check.checked = this.current.has(n);
+    check.disabled = this.file.disabled?.includes(n) || false;
     check.onchange = () => { check.checked ? this.current.add(n) : this.current.delete(n); this.counts(); };
     label.append(check, ` ${n}페이지`);
+    if (this.file.labels) label.title = this.file.labels[n - 1];
     const link = document.createElement('a'); link.target = '_blank'; link.rel = 'noopener';
-    link.href = `/api/intake/${this.draft.token}/files/${this.file.index}/pages/${n}`;
+    link.href = this.draft.job ? `/api/transfer/jobs/${encodeURIComponent(this.draft.job)}/input/${n - 1}` : `/api/intake/${this.draft.token}/files/${this.file.index}/pages/${n}`;
     link.title = `${n}페이지 크게 보기`;
     const placeholder = document.createElement('span'); placeholder.className = 'preview-placeholder'; placeholder.textContent = '미리보기 준비 중';
     link.append(placeholder); node.append(label, link);

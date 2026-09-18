@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.concurrency import run_in_threadpool
 from app.errors import UserError, explain
 
-from app import export, jobs, llm, pdf_gen, templates_store, worker, updater
+from app import export, jobs, llm, pdf_gen, templates_store, worker, updater, job_context
 from app.config import GITHUB_REPO, JOBS_DIR, STATIC_DIR, VERSION
 
 app = FastAPI(title="handwrite-scanner")
@@ -297,14 +297,19 @@ async def job_field_update(job_id: str, body: dict):
     """검수 수정: {page, id, value}. 후보 타입인데 목록에 없는 값이면 학습 제안."""
     safe_id = _safe(job_id)
     res = jobs.results(safe_id)
-    page = res[body["page"]]
+    if (jobs.status(safe_id) or {}).get('state') in ('queued', 'running'):
+        raise HTTPException(409, '작업을 중단한 뒤 검수 값을 수정하세요.')
+    page = next((p for p in (res or []) if p['page'] == body['page']), None)
+    if page is None:
+        raise HTTPException(404, '완료된 페이지가 아닙니다.')
     suggest = None
     for f in page["fields"]:
         if f["id"] == body["id"]:
             f["value"] = body["value"]
             f["confidence"] = 1.0
             tpl_name = page.get("template") or (jobs.status(safe_id) or {}).get("template")
-            if (tpl_name and f.get("type") in ("candidates", "circle")
+            if (tpl_name and not (job_context.read(safe_id) or {}).get('imported')
+                    and f.get("type") in ("candidates", "circle")
                     and body["value"].strip()):
                 tpl = templates_store.get(tpl_name)
                 tf = next((x for x in (tpl or {}).get("fields", [])
@@ -326,22 +331,23 @@ async def template_add_candidate(name: str, body: dict):
 @app.post("/api/jobs/{job_id}/cancel")
 def job_cancel(job_id: str):
     safe_id = _safe(job_id)
-    st = jobs.status(safe_id)
-    if not st:
-        raise HTTPException(404, "작업 없음")
-    if st["state"] == "queued":
-        st["state"] = "cancelled"
-        jobs.write_status(safe_id, st)
-        worker.cancel(safe_id)
-        return {"ok": True}
-    if st["state"] == "running":
-        worker.cancel(safe_id)  # 진행 중인 필드 하나는 끝내고 멈춤
-        return {"ok": True}
-    raise HTTPException(409, "이미 종료된 작업입니다")
+    with jobs._io_lock:
+        st = jobs.status(safe_id)
+        if not st:
+            raise HTTPException(404, "작업 없음")
+        if st["state"] == "queued":
+            st["state"] = "cancelled"
+            jobs.write_status(safe_id, st)
+            worker.cancel(safe_id)
+            return {"ok": True}
+        if st["state"] == "running":
+            worker.cancel(safe_id)
+            return {"ok": True}
+        raise HTTPException(409, "이미 종료된 작업입니다")
 
 
 @app.post("/api/jobs/{job_id}/resume")
-def job_resume(job_id: str):
+def job_resume(job_id: str, accept_current_model: bool = False):
     """완료된 페이지 결과를 보존하고 오류·중단된 작업을 이어간다."""
     safe_id = _safe(job_id)
     st = jobs.status(safe_id)
@@ -349,11 +355,13 @@ def job_resume(job_id: str):
         raise HTTPException(404, "작업 없음")
     if st["state"] not in ("error", "cancelled"):
         raise HTTPException(409, "오류 또는 중단된 작업만 이어갈 수 있습니다")
+    from app.transfer_api import check_resume_model
+    accepted_model = check_resume_model(safe_id, accept_current_model)
+    if accepted_model:
+        st['model'] = accepted_model
     if (jobs.JOBS_DIR / safe_id / "results.json").exists():
         results = jobs.results(safe_id)
-        if (not isinstance(results, list)
-                or any(not isinstance(p, dict) or p.get("page") != i
-                       for i, p in enumerate(results))):
+        if not job_context.valid_results(safe_id, results):
             raise HTTPException(409, "저장된 결과가 손상되어 이어갈 수 없습니다. 처음부터 재인식을 선택하세요")
     st.update(state="queued", progress="이어하기 대기", error=None, error_info=None)
     jobs.write_status(safe_id, st)
@@ -362,7 +370,7 @@ def job_resume(job_id: str):
 
 
 @app.post("/api/jobs/{job_id}/rerun")
-def job_rerun(job_id: str):
+def job_rerun(job_id: str, accept_current_model: bool = False):
     """저장된 원본으로 처음부터 재인식 (템플릿·규칙 변경 후 다시 돌릴 때).
 
     같은 작업 id를 재사용하고 결과를 새로 쓴다 — 이전 결과가 필요하면 먼저 내보내기.
@@ -373,7 +381,16 @@ def job_rerun(job_id: str):
         raise HTTPException(404, "작업 없음")
     if st["state"] in ("queued", "running"):
         raise HTTPException(409, "진행 중인 작업입니다")
+    from app.transfer_api import check_resume_model
+    accepted_model = check_resume_model(safe_id, accept_current_model)
+    if accepted_model:
+        st['model'] = accepted_model
     # 재인식은 처음부터 — 이전 결과를 지워 크래시-이어가기 로직이 발동하지 않게
+    context = job_context.read(safe_id)
+    if context and not context.get('imported'):
+        if st.get('delegated_pages'):
+            raise HTTPException(409, '분담을 해제한 뒤 처음부터 재인식하세요.')
+        job_context.capture(safe_id, refresh=True)
     (jobs.JOBS_DIR / safe_id / "results.json").unlink(missing_ok=True)
     st.update(state="queued", progress="", error=None, error_info=None)
     jobs.write_status(safe_id, st)
@@ -499,4 +516,6 @@ def job_pdf(job_id: str, kind: str = "searchable", inline: bool = False):
     return FileResponse(path, filename=f"{job_id}-{kind}.pdf")
 
 
+from app.transfer_api import router as transfer_router
+app.include_router(transfer_router)
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))

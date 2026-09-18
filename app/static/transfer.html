@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자료 이동 - handwrite-scanner</title>
+<link rel="icon" href="data:,"><link rel="stylesheet" href="app.css">
+<script src="theme.js"></script><script src="feedback.js"></script>
+</head>
+<body class="transfer-page">
+<header><b>handwrite-scanner</b><a href="/">작업</a><a href="template.html">템플릿</a><a class="on" href="transfer.html">자료 이동</a>
+<button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="라이트/다크 전환">☾</button></header>
+<main>
+<div class="card"><h3>다른 PC로 자료 옮기기</h3>
+<p>양식과 작업을 파일로 주고받아 이어서 처리할 수 있습니다. 여러 PC에 페이지를 나눠 맡긴 뒤 결과를 다시 합칠 수도 있습니다.</p>
+<button id="openExport">자료 내보내기</button>
+<label class="transfer-upload">자료 불러오기 <input id="importFile" type="file" accept=".hscan"></label>
+<p class="hint">저장된 자료를 .hscan 파일로 옮깁니다. 작업에 필요한 양식은 함께 포함하며, 모델은 받는 PC에서 설치합니다.</p>
+<p id="transferStatus" role="status"></p><div id="transferResult"></div></div>
+<div class="card"><h3>페이지를 나눠 처리하려면</h3>
+<ol><li>내보내기에서 작업 하나를 고르고 <b>페이지 분담</b>을 선택하세요.</li>
+<li>맡길 페이지를 고르면 이 PC는 해당 페이지를 건너뛰고 나머지를 처리합니다.</li>
+<li>다른 PC에서 파일을 불러와 이어하기로 처리한 뒤, 작업을 다시 내보내세요.</li>
+<li>돌아온 파일을 불러와 <b>기존 작업과 합치기</b>를 누르세요. 원본을 보존한 새 통합 작업이 만들어집니다.</li></ol>
+<p class="hint">파일 전달을 취소하거나 이 PC에서 다시 처리하려면 내보내기 화면에서 ‘분담 해제’를 누르세요.</p></div>
+</main>
+<dialog id="exportDialog" class="transfer-dialog" aria-labelledby="exportTitle">
+<h3 id="exportTitle">자료 내보내기</h3>
+<p class="hint">템플릿 화면의 미저장 편집은 포함되지 않습니다. 필요한 변경은 먼저 저장하세요.</p>
+<fieldset><legend>템플릿</legend><div id="exportTemplates" class="transfer-items"></div></fieldset>
+<fieldset><legend>작업</legend><div id="exportJobs" class="transfer-items"></div></fieldset>
+<label>내보내기 방식 <select id="exportMode"><option value="full">작업 전체 이동 / 결과 돌려보내기</option><option value="split">페이지 분담 (작업 하나)</option></select></label>
+<div id="splitOptions" hidden><button id="chooseSplit" class="secondary">맡길 페이지 선택</button> <span id="splitSummary"></span></div>
+<p class="hint">중단한 페이지는 처음부터 다시 처리합니다. 완료된 인식·검수 결과는 유지됩니다. 기존 작업은 현재 등록된 양식이 포함될 수 있습니다.</p>
+<p id="exportStatus" role="status"></p>
+<div class="transfer-actions"><button id="cancelExport" class="secondary">취소</button><button id="runExport">파일 만들기</button></div>
+</dialog>
+<dialog id="importDialog" class="transfer-dialog" aria-labelledby="importTitle">
+<h3 id="importTitle">자료 불러오기</h3>
+<p class="hint">가져온 작업은 자동으로 시작하지 않습니다. 작업에 필요한 양식은 전용 사본으로 보관됩니다.</p>
+<fieldset><legend>템플릿 목록에도 추가하기</legend><div id="importTemplates" class="transfer-items"></div></fieldset>
+<fieldset><legend>작업</legend><div id="importJobs" class="transfer-items"></div></fieldset>
+<label><input type="checkbox" id="copyDuplicates">이미 가져온 작업도 별도 사본으로 추가</label>
+<p id="importStatus" role="status"></p>
+<div class="transfer-actions"><button id="cancelImport" class="secondary">닫기</button><button id="runImport">선택한 자료 가져오기</button></div>
+</dialog>
+<dialog id="mergeDialog" class="transfer-dialog" aria-labelledby="mergeTitle">
+<h3 id="mergeTitle">기존 작업과 합치기</h3>
+<label>기준 작업 <select id="mergeTarget"></select></label> <button id="previewMerge" class="secondary">병합 내용 확인</button>
+<p>두 원본 작업은 보존하고 새 통합 작업을 만듭니다. 서로 다른 결과가 있는 페이지는 아래에서 선택하세요.</p>
+<p id="mergeSummary" role="status"></p><div id="mergeConflicts"></div>
+<div class="transfer-actions"><button id="cancelMerge" class="secondary">취소</button><button id="runMerge" disabled>새 통합 작업 만들기</button></div>
+</dialog>
+<script src="page-picker.js"></script><script src="transfer.js"></script>
+</body></html>

@@ -13,6 +13,7 @@
 <header><b>handwrite-scanner</b>
   <a class="on" href="/">작업</a><a href="template.html">템플릿</a>
   <span id="llm" class="hint"></span>
+  <a href="transfer.html">자료 이동</a>
   <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="라이트/다크 전환">☾</button>
 </header>
 <main>
@@ -174,7 +175,7 @@ function renderJobs() {
         done:'완료', error:'오류', cancelled:'중단됨'}[s.state] || s.state)}</span></td>
       <td>${s.state === 'error' ? `<div class="hint">${esc(s.progress || '')}</div><div class="job-error">${esc(info.message)}</div><div>${esc(info.action)}</div>
         <details><summary>기술 상세</summary><pre>${esc(s.error || '')}</pre></details>` : esc(s.progress || '')}</td>
-      <td>${s.state === 'done' ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}
+      <td>${s.state === 'done' || s.import_key ? `<a href="review.html?id=${encodeURIComponent(s.id)}">검수/다운로드</a>` : ''}
       ${['running', 'queued'].includes(s.state) ? `<button class="secondary" style="padding:3px 10px;font-size:12px"
         onclick="cancelJob('${esc(s.id)}')">중단</button>` : `<button class="secondary" style="padding:3px 10px;font-size:12px"
         onclick="rerunJob('${esc(s.id)}')">처음부터 재인식</button>`}

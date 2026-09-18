@@ -28,6 +28,7 @@ def create(template: str | None, files: list[tuple[str, bytes]], *, defer=False,
         write_status(job_id, {"id": job_id, "template": template, "state": "queued", **options,
                              "phase": "preparing", "inputs_ready": False,
                              "progress": "접수 완료 · 문서 준비 대기", "created": time.strftime("%Y-%m-%d %H:%M:%S")})
+        _capture_context(job_id)
         return job_id
     page = 0
     for name, data in files:
@@ -46,7 +47,17 @@ def create(template: str | None, files: list[tuple[str, bytes]], *, defer=False,
         page += 1
     write_status(job_id, {"id": job_id, "template": template, "state": "queued",
                           "progress": "", "created": time.strftime("%Y-%m-%d %H:%M:%S")})
+    _capture_context(job_id)
     return job_id
+
+
+def _capture_context(job_id):
+    from app import job_context
+    try:
+        job_context.capture(job_id)
+    except Exception:
+        delete(job_id)
+        raise
 
 
 def prepare_inputs(job_id, st, check_cancel):
@@ -97,6 +108,9 @@ def prepare_inputs(job_id, st, check_cancel):
     _write_atomic(job_id, 'input_pages.json', json.dumps(sources, ensure_ascii=False))
     st.update(inputs_ready=True, selected_pages=page, phase='recognizing', progress=f'문서 준비 완료 · {page}페이지')
     write_status(job_id, st)
+    from app import job_context
+    if job_context.read(job_id):
+        job_context.ensure_pages(job_id)
 
 
 def _read(job_id: str, name: str):
@@ -146,7 +160,7 @@ def remember_status_failure(job_id, st, exc):
 
 def write_results(job_id: str, res: list) -> None:
     _write_atomic(job_id, "results.json",
-                  json.dumps(res, ensure_ascii=False, indent=2))
+                  json.dumps(sorted(res, key=lambda p: p['page']), ensure_ascii=False, indent=2))
 
 
 def list_jobs() -> list[dict]:

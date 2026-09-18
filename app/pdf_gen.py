@@ -10,7 +10,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
-from app import jobs, templates_store
+from app import jobs, templates_store, job_context
 from app.config import JOBS_DIR
 
 pdfmetrics.registerFont(TTFont("Malgun", r"C:\Windows\Fonts\malgun.ttf"))
@@ -97,7 +97,7 @@ def _clean(job_id: str, res: list, out) -> None:
     tpl_names = {p.get("template") or st.get("template") for p in res}
     darks = {}
     for name in tpl_names:
-        ref = templates_store.reference_path(name) if name else None
+        ref = job_context.reference(job_id, name) if name else None
         if ref and ref.exists():
             darks[name] = (ref, np.array(Image.open(ref).convert("L")) < 128)
     if not darks:

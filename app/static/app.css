@@ -152,6 +152,22 @@ summary { cursor: pointer; }
   max-width: none; max-height: none; padding: 0; border: 1px solid var(--line); border-radius: 12px;
   background: var(--surface); color: var(--text); box-shadow: 0 16px 70px #0005; }
 #pagePicker::backdrop { background: #0008; }
+.transfer-dialog { width: min(960px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); overflow: auto;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.transfer-dialog::backdrop { background: #0008; }
+.transfer-dialog fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 12px 0; min-width: 0; }
+.transfer-items { max-height: 280px; overflow: auto; }
+.transfer-items label { display: block; padding: 8px 0; overflow-wrap: anywhere; }
+.transfer-job { border-bottom: 1px solid var(--line); padding: 6px 0; }
+.transfer-job p { margin: 4px 0; }
+.transfer-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 16px; position: sticky; bottom: -20px; background: var(--surface); padding-bottom: 16px; }
+.transfer-upload { display: inline-block; margin: 12px; }
+#splitOptions { margin: 12px 0; }
+#mergeConflicts pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; padding: 8px; background: var(--bg); }
+#mergeConflicts fieldset > label { display: inline-block; vertical-align: top; width: 48%; }
+#transferResult > div { margin: 12px 0; overflow-wrap: anywhere; }
+.transfer-page header { flex-wrap: wrap; }
+.transfer-page header a, .transfer-page header b { white-space: nowrap; }
 .picker-shell { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .picker-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 20px 8px; }
 .picker-heading h3 { margin: 0; } .picker-heading p { margin: 6px 0; }
