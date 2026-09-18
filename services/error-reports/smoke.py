@@ -17,8 +17,11 @@ report = dict(schema=1, report_id=str(uuid.uuid4()), created_at=datetime.now(tim
               screen='unknown', jobs={}, job_progress=[{'state': 'error', 'phase': 'recognizing', 'page': 2, 'total_pages': 105}],
               events=[], contact='', description='Synthetic deployment verification; no user data.')
 if options.feedback:
-    report = {k: report[k] for k in ('schema', 'report_id', 'created_at', 'app_version', 'screen', 'contact', 'description')}
     report.update(kind='feedback', category='suggestion')
+report['environment'] = {'python_version':'3.14.0', 'ram_available_gb':4, 'process_memory_mb':256,
+                         'graphics':[{'name':'Synthetic GPU','driver_version':'1.0'}], 'engine_state':'idle'}
+report['browser'] = {'user_agent':'Synthetic browser', 'language':'ko-KR', 'viewport_width':1280,
+                     'viewport_height':720, 'pixel_ratio':1}
 with httpx.Client(timeout=30) as client:
     health = client.get(endpoint.replace('/reports', '/health'))
     assert health.status_code == 200, health.status_code

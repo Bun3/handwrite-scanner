@@ -33,12 +33,8 @@
     dialog.innerHTML = `<h2 id="diagnosticTitle">오류 보고</h2>
       <label>보낼 내용 <select id="diagnosticKind"><option value="error">오류 보고</option><option value="feedback">의견 보내기</option></select></label>
       <label id="diagnosticCategoryRow" hidden>의견 종류 <select id="diagnosticCategory"><option value="suggestion">개선 제안</option><option value="usability">사용 불편</option><option value="other">기타 의견</option></select></label>
-      <p id="diagnosticErrorInfo">앱 개발자에게 오류 코드·발생 위치·기기 사양·작업 상태와 최근 진단 기록을 보냅니다.
-      원본 문서, 인식 내용, 파일 경로, PC 사용자 이름, 엔진 로그 원문은 자동 수집하지 않습니다.</p>
-      <p id="diagnosticFeedbackInfo" hidden>앱 버전·현재 화면과 직접 입력한 의견·연락처만 보냅니다. 기기 사양·진단 기록·문서 내용은 첨부하지 않습니다.</p>
-      <p class="hint">Cloudflare를 통해 전송·보관하며 보고서는 30일 후 삭제 대상이 됩니다.
-      접속 IP는 서버의 전송 제한에 사용되지만 보고서에는 저장하지 않습니다.
-      아래 입력란에 환자 정보나 비밀번호를 적지 마세요.</p>
+      <p id="diagnosticErrorInfo">문제 분석에 필요한 기기 사양·사용 환경·작업 상태·최근 진단 정보를 함께 보냅니다. 아래에서 전송 내용을 확인할 수 있습니다.</p>
+      <p id="diagnosticFeedbackInfo" hidden>의견을 검토할 때 참고할 수 있도록 기기 사양·사용 환경·작업 상태·최근 진단 정보를 함께 보냅니다. 아래에서 전송 내용을 확인할 수 있습니다.</p>
       <label>연락처 (선택)<input id="diagnosticContact" maxlength="200" autocomplete="off" placeholder="답변받을 이메일 등"></label>
       <label><span id="diagnosticDescriptionLabel">어떤 작업 중 발생했나요? (선택)</span><textarea id="diagnosticDescription" maxlength="4000" rows="3"></textarea></label>
       <p class="hint">내용 최대 4,000자 · 연락처 최대 200자. 오류·의견 합산 IP당 1분 5회, 전체 하루 1,000건까지 접수합니다.</p>
@@ -64,7 +60,9 @@
       busy = true; sync();
       const data = {code, kind: el('diagnosticKind').value, category: el('diagnosticCategory').value,
         screen: location.pathname.split('/').pop().replace('.html', '') || 'index',
-        contact: el('diagnosticContact').value, description: el('diagnosticDescription').value};
+        contact: el('diagnosticContact').value, description: el('diagnosticDescription').value,
+        browser: {user_agent:navigator.userAgent.slice(0,512), language:navigator.language.slice(0,40),
+          viewport_width:innerWidth, viewport_height:innerHeight, pixel_ratio:devicePixelRatio}};
       try {
         const result = await post('preview', data);
         if (data.kind === 'feedback' && result.report?.kind !== 'feedback') {
@@ -117,7 +115,7 @@
     button.onclick = () => window.openDiagnosticReport();
     (document.querySelector('header') || document.body).append(button);
     const feedback = document.createElement('button'); feedback.textContent = '의견 보내기'; feedback.className = 'secondary';
-    feedback.title = '개선 제안이나 사용 중 불편한 점을 보냅니다. 진단 정보는 첨부하지 않습니다.';
+    feedback.title = '개선 제안이나 사용 중 불편한 점을 기기 사양·진단 정보와 함께 보냅니다.';
     feedback.onclick = () => window.openDiagnosticReport('unexpected', 'feedback');
     button.after(feedback);
   });

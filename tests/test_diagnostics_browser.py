@@ -55,6 +55,9 @@ def test_feedback_empty_guard_category_preview_and_mode_change(screen):
     page.goto(url)
     page.get_by_role('button', name='의견 보내기', exact=True).click()
     pw.expect(page.locator('#diagnosticFeedbackInfo')).to_be_visible()
+    pw.expect(page.locator('#diagnosticFeedbackInfo')).to_contain_text('기기 사양')
+    assert 'Cloudflare' not in page.locator('#diagnosticDialog').inner_text()
+    assert '환자 정보나 비밀번호' not in page.locator('#diagnosticDialog').inner_text()
     pw.expect(page.locator('#diagnosticErrorInfo')).not_to_be_visible()
     page.locator('#diagnosticPrepare').click()
     assert not previews

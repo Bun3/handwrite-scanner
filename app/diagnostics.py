@@ -80,6 +80,14 @@ def record_error(exc, code, source):
         pass
 
 
+class BrowserInfo(BaseModel):
+    user_agent: str = Field(default='', max_length=512)
+    language: str = Field(default='', max_length=40)
+    viewport_width: int = Field(default=0, ge=0, le=100000)
+    viewport_height: int = Field(default=0, ge=0, le=100000)
+    pixel_ratio: float = Field(default=1, ge=0, le=100, allow_inf_nan=False)
+
+
 class Preview(BaseModel):
     kind: Literal['error', 'feedback'] = 'error'
     category: Literal['suggestion', 'usability', 'other'] = 'suggestion'
@@ -87,6 +95,7 @@ class Preview(BaseModel):
     screen: str = Field(default='unknown', max_length=30)
     contact: str = Field(default='', max_length=200)
     description: str = Field(default='', max_length=4000)
+    browser: BrowserInfo | None = None
 
 
 class Submission(BaseModel):
@@ -103,13 +112,9 @@ def _local(request):
 
 
 def build_report(data):
-    if data.kind == 'feedback':
-        if not data.description.strip():
-            raise HTTPException(400, '보낼 의견을 입력해 주세요.')
-        return dict(schema=1, kind='feedback', category=data.category,
-                    report_id=str(uuid.uuid4()), created_at=_now(), app_version=config.VERSION,
-                    screen=data.screen if data.screen in ('index', 'template', 'review', 'transfer') else 'unknown',
-                    contact=data.contact, description=data.description)
+    if data.kind == 'feedback' and not data.description.strip():
+        raise HTTPException(400, '보낼 의견을 입력해 주세요.')
+    from app.diagnostic_environment import collect
     system = dict(os=platform.system(), release=platform.release(),
                   architecture=platform.machine(), cpu_threads=os.cpu_count(),
                   cpu=platform.processor()[:120], os_build=platform.version()[:120])
@@ -133,7 +138,7 @@ def build_report(data):
         for s in statuses:
             if s.get('state') not in ('queued', 'running', 'cancelled', 'error'):
                 continue
-            phase = s.get('phase') if s.get('phase') in ('preparing', 'recognizing', 'starting_engine', 'loading_model') else 'unknown'
+            phase = s.get('phase') if s.get('phase') in ('preparing', 'recognizing', 'engine_loading', 'starting_engine', 'loading_model') else 'unknown'
             item = {'state': s['state'], 'phase': phase}
             match = re.match(r'^(\d{1,7})/(\d{1,7})페이지', str(s.get('progress', '')))
             if match:
@@ -143,12 +148,17 @@ def build_report(data):
                 break
     except Exception:
         counts = {}
-    return dict(schema=1, report_id=str(uuid.uuid4()), created_at=_now(),
-                app_version=config.VERSION, system=system, model=model,
+    report = dict(schema=1, report_id=str(uuid.uuid4()), created_at=_now(),
+                app_version=config.VERSION, system=system, environment=collect(), model=model,
                 error_code=_symbol(data.code), screen=data.screen if data.screen in
                 ('index', 'template', 'review', 'transfer') else 'unknown',
                 jobs=counts, job_progress=progress, events=_events(), contact=data.contact,
                 description=data.description)
+    if data.kind == 'feedback':
+        report.update(kind='feedback', category=data.category)
+    if data.browser is not None:
+        report['browser'] = data.browser.model_dump()
+    return report
 
 
 @router.post('/preview')

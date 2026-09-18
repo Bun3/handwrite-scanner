@@ -10,8 +10,13 @@ function keys(o, allowed) {
     && Object.keys(o).every(k=>allowed.includes(k));
 }
 export function validReport(p) {
-  if(p?.kind==='feedback')return validFeedback(p);
-  return keys(p,['schema','report_id','created_at','app_version','system','model','error_code','screen','jobs','job_progress','events','contact','description'])
+  if(p?.kind==='feedback') {
+    if(!Object.hasOwn(p,'system'))return validFeedback(p); // Older clients remain supported.
+    const {kind,category,...diagnostic}=p;
+    return ['suggestion','usability','other'].includes(category) && text(p.description,4000)
+      && p.description.trim().length>0 && validReport(diagnostic);
+  }
+  return keys(p,['schema','report_id','created_at','app_version','system','environment','browser','model','error_code','screen','jobs','job_progress','events','contact','description'])
     && p.schema===1 && typeof p.report_id==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(p.report_id)
     && text(p.created_at,40) && /^[0-9T:+.Z-]+$/.test(p.created_at) && Number.isFinite(Date.parse(p.created_at))
     && symbol(p.app_version) && symbol(p.model) && symbol(p.error_code)
@@ -20,11 +25,15 @@ export function validReport(p) {
     && ['os','release','architecture'].every(k=>text(p.system[k],120))
     && ['cpu','os_build'].every(k=>p.system[k]===undefined || text(p.system[k],120))
     && ['cpu_threads','ram_gb','disk_free_gb'].every(k=>p.system[k]===null || number(p.system[k]))
+    && (p.environment===undefined || validEnvironment(p.environment))
+    && (p.browser===undefined || (keys(p.browser,['user_agent','language','viewport_width','viewport_height','pixel_ratio'])
+      && text(p.browser.user_agent,512) && text(p.browser.language,40)
+      && ['viewport_width','viewport_height','pixel_ratio'].every(k=>number(p.browser[k]))))
     && keys(p.jobs,['queued','running','done','cancelled','error']) && Object.values(p.jobs).every(number)
     && (p.job_progress===undefined || (Array.isArray(p.job_progress) && p.job_progress.length<=10
       && p.job_progress.every(j=>keys(j,['state','phase','page','total_pages'])
         && ['queued','running','cancelled','error'].includes(j.state)
-        && ['preparing','recognizing','starting_engine','loading_model','unknown'].includes(j.phase)
+        && ['preparing','recognizing','engine_loading','starting_engine','loading_model','unknown'].includes(j.phase)
         && ['page','total_pages'].every(k=>j[k]===undefined || (Number.isInteger(j[k]) && number(j[k]))))))
     && Array.isArray(p.events) && p.events.length<=100 && p.events.every(e=>
       keys(e,['time','code','source','exception','frames']) && text(e.time,40) && /^[0-9T:+.Z-]*$/.test(e.time)
@@ -32,6 +41,21 @@ export function validReport(p) {
       && Array.isArray(e.frames) && e.frames.length<=8 && e.frames.every(f=>
         keys(f,['module','line']) && symbol(f.module) && Number.isInteger(f.line) && number(f.line)))
     && text(p.contact,200) && text(p.description,4000);
+}
+
+function validEnvironment(e) {
+  const strings=['python_version','cpu_name','engine_state','engine_error_code'];
+  const nums=['process_bits','app_uptime_s','process_cpu_s','ram_available_gb','ram_load_percent',
+    'commit_limit_gb','commit_available_gb','process_memory_mb','process_private_mb','cpu_mhz',
+    'cpu_load_percent','system_uptime_s','disk_total_gb','disk_used_gb','model_size_mb','projection_size_mb'];
+  return keys(e,[...strings,...nums,'frozen','model_installed','graphics','dependencies'])
+    && strings.every(k=>e[k]===undefined || text(e[k],120))
+    && nums.every(k=>e[k]===undefined || number(e[k]))
+    && ['frozen','model_installed'].every(k=>e[k]===undefined || typeof e[k]==='boolean')
+    && (e.graphics===undefined || (Array.isArray(e.graphics) && e.graphics.length<=8
+      && e.graphics.every(g=>keys(g,['name','driver_version']) && text(g.name,120) && text(g.driver_version,120))))
+    && (e.dependencies===undefined || (keys(e.dependencies,['fastapi','httpx','pillow','pymupdf','opencv-python-headless'])
+      && Object.values(e.dependencies).every(v=>text(v,80))));
 }
 
 function validFeedback(p) {

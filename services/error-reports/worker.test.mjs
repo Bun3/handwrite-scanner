@@ -82,3 +82,13 @@ test('feedback uses the same limiter and quota; rejects empty or diagnostic atta
   assert.equal((await worker.fetch(request(p),env)).status,429);
   assert.equal(env.writes.length,1);
 });
+
+test('detailed diagnostics accepted for both kinds but arbitrary environment fields rejected', async()=>{
+  const detailed={...payload(),environment:{python_version:'3.14.0',frozen:false,
+    ram_available_gb:5,ram_load_percent:70,process_memory_mb:400,engine_state:'idle',
+    graphics:[{name:'Synthetic GPU',driver_version:'1.0'}],dependencies:{fastapi:'1.0'}}};
+  for(const p of [detailed,{...detailed,kind:'feedback',category:'usability'}]){
+    assert.equal((await worker.fetch(request(p),environment())).status,201);
+    assert.equal((await worker.fetch(request({...p,environment:{...p.environment,password:'SECRET'}}),environment())).status,400);
+  }
+});

@@ -17,7 +17,7 @@ def client(tmp_path, monkeypatch):
 
 def test_preview_excludes_raw_private_data_and_journal_is_bounded(client):
     try:
-        raise ValueError(r'C:\Users\private\patient.pdf secret-token PATIENT SECRET')
+        raise ValueError(r'C:\Users\sensitive_user_928\patient.pdf secret-token PATIENT SECRET')
     except ValueError as exc:
         for _ in range(110):
             d.record_error(exc, 'unexpected', 'worker')
@@ -25,7 +25,7 @@ def test_preview_excludes_raw_private_data_and_journal_is_bounded(client):
     assert r.status_code == 200
     report = r.json()['report']
     text = json.dumps(report)
-    assert all(s not in text for s in ['private', 'PATIENT', 'secret-token', 'PRIVATE NAME'])
+    assert all(s not in text for s in ['sensitive_user_928', 'PATIENT', 'secret-token', 'PRIVATE NAME'])
     assert len(report['events']) <= 100
     assert report['jobs']['error'] == 1
     assert report['events'][-1]['exception'] == 'ValueError'
@@ -94,11 +94,7 @@ def test_real_transport_no_redirect_and_receipt_validation(client, monkeypatch):
         d.send_report(report)
 
 
-def test_feedback_is_required_bounded_and_never_collects_diagnostics(client, monkeypatch):
-    def forbidden():
-        raise AssertionError('feedback must not inspect device or jobs')
-    monkeypatch.setattr(d.jobs, 'list_jobs', forbidden)
-    monkeypatch.setattr(d.platform, 'system', forbidden)
+def test_feedback_is_required_bounded_and_includes_diagnostics(client, monkeypatch):
     for description in ['', '   ', 'x' * 4001]:
         assert client.post('/api/diagnostics/preview', json={'kind':'feedback', 'description':description}).status_code in (400,422)
     response = client.post('/api/diagnostics/preview', json={'kind':'feedback', 'category':'suggestion', 'description':'Please add an option'})
@@ -106,5 +102,21 @@ def test_feedback_is_required_bounded_and_never_collects_diagnostics(client, mon
     report = response.json()['report']
     assert report['kind'] == 'feedback'
     assert report['category'] == 'suggestion'
-    assert not {'system','jobs','events','model','error_code'} & report.keys()
+    assert {'system','environment','jobs','events','model','error_code'} <= report.keys()
+    assert report['environment']['python_version']
+    assert 'PRIVATE NAME' not in json.dumps(report)
     assert client.post('/api/diagnostics/preview', json={'kind':'feedback', 'category':'invalid','description':'hello'}).status_code == 422
+
+
+def test_optional_hardware_failure_keeps_other_diagnostics(client, monkeypatch):
+    from app import diagnostic_environment as env
+    def fail():
+        raise OSError('PRIVATE registry path')
+    monkeypatch.setattr(env, '_memory', fail)
+    monkeypatch.setattr(env, '_hardware', fail)
+    report = client.post('/api/diagnostics/preview', json={'kind':'feedback','description':'slow',
+        'browser':{'user_agent':'Synthetic','language':'ko-KR','viewport_width':1280,'viewport_height':720,'pixel_ratio':1.5}}).json()['report']
+    assert report['environment']['python_version']
+    assert 'ram_available_gb' not in report['environment']
+    assert 'PRIVATE' not in json.dumps(report)
+    assert report['browser']['pixel_ratio'] == 1.5
