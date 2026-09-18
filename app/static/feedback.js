@@ -20,6 +20,12 @@ function notify(message, options = {}) {
     pre.textContent = options.technical; details.append(summary, pre); card.append(details);
   }
   host.prepend(card);
+  if (options.code || options.technical || options.reportable) {
+    const report = document.createElement('button'); report.className = 'secondary';
+    report.textContent = '이 오류 보고하기';
+    report.onclick = () => window.openDiagnosticReport?.(options.code || 'unexpected');
+    card.append(report);
+  }
   while (host.children.length > 4) host.lastElementChild.remove();
 }
 
@@ -28,7 +34,7 @@ async function apiFetch(url, options) {
   try { response = await fetch(url, options); }
   catch (cause) {
     const error = new Error('프로그램과 연결할 수 없습니다. 프로그램 실행 상태와 네트워크를 확인하세요.');
-    error.reported = true; if (!window.updateRestarting) notify(error.message); throw error;
+    error.reported = true; if (!window.updateRestarting) notify(error.message, {code: 'app_connection'}); throw error;
   }
   if (!response.ok) {
     let body = {};
@@ -41,7 +47,7 @@ async function apiFetch(url, options) {
     }
     const message = info.message || (typeof body.detail === 'string' ? body.detail : `요청을 처리하지 못했습니다 (${response.status}).`);
     const error = new Error(message); error.reported = true; error.info = info;
-    notify(message, info); throw error;
+    notify(message, {...info, code: info.code || `http_${response.status}`, reportable: true}); throw error;
   }
   return response;
 }
@@ -63,4 +69,9 @@ async function loadImage(url) {
 window.addEventListener('unhandledrejection', event => {
   if (!event.reason?.reported) notify('요청을 완료하지 못했습니다. 다시 시도해 주세요.', {technical: String(event.reason)});
   event.preventDefault();
+});
+
+window.addEventListener('error', event => {
+  if (event.error) notify('화면을 처리하는 중 오류가 발생했습니다. 오류 보고로 발생 상황을 알려 주세요.',
+    {code: 'browser_error', technical: String(event.error)});
 });

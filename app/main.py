@@ -19,6 +19,8 @@ app = FastAPI(title="handwrite-scanner")
 async def friendly_error(request, exc):
     import traceback
     info = explain(exc)
+    from app.diagnostics import record_error
+    record_error(exc, info['code'], 'api')
     info['technical'] = ''.join(traceback.format_exception(exc, limit=4))
     if info['code'].startswith('engine_'):
         info['technical'] += '\n' + llm.log_tail()
@@ -518,4 +520,6 @@ def job_pdf(job_id: str, kind: str = "searchable", inline: bool = False):
 
 from app.transfer_api import router as transfer_router
 app.include_router(transfer_router)
+from app.diagnostics import router as diagnostics_router
+app.include_router(diagnostics_router)
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))

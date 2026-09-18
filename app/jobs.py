@@ -153,7 +153,9 @@ def write_status(job_id: str, st: dict) -> None:
 
 def remember_status_failure(job_id, st, exc):
     from app.errors import explain
+    from app.diagnostics import record_error
     info = explain(exc)
+    record_error(exc, info['code'], 'status_write')
     info['action'] += ' 이 오류 상태는 디스크에 저장하지 못했으므로 프로그램을 닫기 전에 확인해 주세요.'
     _volatile_status[job_id] = dict(st, state='error', error=str(exc), error_info=info)
 

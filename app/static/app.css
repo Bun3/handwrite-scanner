@@ -198,4 +198,11 @@ summary { cursor: pointer; }
 [hidden] + .help-trigger, [style*="display:none"] + .help-trigger, [style*="display: none"] + .help-trigger { display:none; }
 .help-tooltip { position:fixed; inset:auto; margin:0; z-index:10000; box-sizing:border-box; width:max-content; max-width:min(380px, calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; padding:12px 14px; background:var(--surface); color:var(--text); border:1px solid var(--accent); border-radius:8px; box-shadow:0 4px 18px #0005; font-size:14px; font-weight:400; line-height:1.65; text-align:left; white-space:normal; overflow-wrap:anywhere; }
 .help-tooltip[hidden] { display:none; }
+#diagnosticDialog { width:min(700px, calc(100vw - 40px)); box-sizing:border-box; }
+#diagnosticDialog > label { display:block; margin:12px 0; }
+#diagnosticContact, #diagnosticDescription { display:block; width:100%; box-sizing:border-box; margin-top:6px; }
+#diagnosticPreview { white-space:pre-wrap; overflow-wrap:anywhere; max-height:240px; overflow:auto; padding:12px; background:var(--bg); font-size:12px; }
+.diagnostic-actions { display:flex; gap:8px; flex-wrap:wrap; position:sticky; bottom:-20px;
+  margin:0 -20px -20px; padding:12px 20px; background:var(--surface); border-top:1px solid var(--line); }
+#diagnosticStatus { overflow-wrap:anywhere; }
 @media (pointer:coarse) { .help-trigger { width:32px; height:32px; } }

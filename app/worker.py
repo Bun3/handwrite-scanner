@@ -80,6 +80,8 @@ def _loop() -> None:
             st["state"] = "error"
             st["error"] = traceback.format_exc(limit=3)
             st["error_info"] = explain(exc)
+            from app.diagnostics import record_error
+            record_error(exc, st['error_info']['code'], 'worker')
             if st['error_info']['code'].startswith('engine_') or st['error_info']['code'] == 'memory':
                 st['error'] += '\n' + llm.log_tail()
         _cancel.discard(job_id)
