@@ -29,7 +29,6 @@
   </div>
   <form id="up">
     <input type="file" name="files" multiple accept="image/*,.pdf" required>
-    <fieldset><legend>검사할 양식 (여러 개 선택 가능)</legend><div id="templateChoices"></div></fieldset>
     <p class="hint">선택한 양식과 맞지 않는 처방전·증빙 문서 등은 건너뜁니다. 파일을 선택하면 페이지를 미리 보고 검사 대상을 고를 수 있습니다.</p>
     <div id="pageSelection"></div>
     <button id="submitJob">인식 시작</button>
@@ -74,6 +73,7 @@
   <table id="jobs"><tr><th>ID</th><th>템플릿</th><th>상태</th><th>진행</th><th></th></tr></table>
 </div>
 </main>
+<script src="page-picker.js"></script>
 <script src="document-input.js"></script>
 <script>
 async function j(u, o) { const r = await apiFetch(u, o); return r.json(); }
@@ -84,18 +84,27 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,
 async function loadTpl() {
   const tpls = await j('/api/templates');
   document.getElementById('tplHint').style.display = tpls.length ? 'none' : '';
-  const choices = document.getElementById('templateChoices'), m = document.getElementById('mTpl');
-  for (const t of tpls) {
-    const label = document.createElement('label'), check = document.createElement('input');
-    check.type = 'checkbox'; check.value = t.name; check.checked = true;
-    label.append(check, ' ' + t.name); choices.append(label); m.add(new Option(t.name, t.name));
-  }
+  availableTemplates = tpls;
+  inputTemplates = new Set(tpls.filter(t => inputTemplates === null || inputTemplates.has(t.name)).map(t => t.name));
+  const m = document.getElementById('mTpl'), previous = m.value;
+  m.replaceChildren(...tpls.map(t => new Option(t.name, t.name)));
+  if (tpls.some(t => t.name === previous)) m.value = previous;
+  renderPageSelection();
 }
 
-document.getElementById('sf').onsubmit = async e => {
-  e.preventDefault();
-  const hits = await j('/api/search?q=' + encodeURIComponent(document.getElementById('sq').value));
+let searchRequest = 0;
+async function searchDocuments(query) {
+  const request = ++searchRequest;
   const tb = document.getElementById('sr');
+  try {
+    if (query) sessionStorage.setItem('documentSearch', query);
+    else sessionStorage.removeItem('documentSearch');
+  } catch {}
+  tb.style.display = 'none';
+  if (!query) return;
+  let hits;
+  try { hits = await j('/api/search?q=' + encodeURIComponent(query)); } catch { return; }
+  if (request !== searchRequest) return;
   tb.style.display = '';
   tb.innerHTML = '<tr><th>값</th><th>필드</th><th>양식</th><th>처리일시</th><th></th></tr>';
   if (!hits.length) { tb.insertRow().innerHTML = '<td colspan="5" class="hint">결과 없음</td>'; return; }
@@ -104,7 +113,16 @@ document.getElementById('sf').onsubmit = async e => {
       <td>${esc(h.template || '-')}</td><td>${esc(h.created)}</td>
       <td><a href="review.html?id=${encodeURIComponent(h.job)}">열기 (${h.page + 1}p)</a></td>`;
   }
+}
+document.getElementById('sf').onsubmit = e => {
+  e.preventDefault();
+  searchDocuments(document.getElementById('sq').value.trim());
 };
+function restoreSearch() {
+  let query;
+  try { query = sessionStorage.getItem('documentSearch'); } catch {}
+  if (query) { document.getElementById('sq').value = query; searchDocuments(query); }
+}
 
 async function mergedExport() {
   const t = document.getElementById('mTpl').value;
@@ -161,7 +179,7 @@ document.querySelector('#up input[type=file]').onchange = prepareInput;
 document.getElementById('up').onsubmit = async e => {
   e.preventDefault();
   if (pendingUpload) return;
-  if (!inputDraft && !await prepareInput()) return;
+  if (!inputDraft) { await prepareInput(); return; }
   const selection = selectedInput();
   if (!selection) return;
   const form = e.target;
@@ -325,7 +343,7 @@ async function installUpdate() {
   } finally { button.disabled = false; }
 }
 
-loadTpl(); refresh(); health(); loadModels(); setInterval(refresh, 3000); setInterval(health, 10000);
+loadTpl().catch(() => {}); restoreSearch(); refresh(); health(); loadModels(); setInterval(refresh, 3000); setInterval(health, 10000);
 setTimeout(updateCheck, 3000);
 </script>
 </body>
