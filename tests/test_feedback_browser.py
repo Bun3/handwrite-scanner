@@ -147,9 +147,9 @@ def test_large_pdf_scroll_is_bounded_and_density_keeps_selection(screen):
     pw.expect(popup.get_by_role('checkbox', name='10000페이지', exact=True)).to_be_visible()
     assert page.locator('.page-choice').count() < 100
     assert len(requests) < 200
-    page.get_by_label('입력 파일').select_option('1')
+    page.locator('#pickerFile').select_option('1')
     popup.get_by_role('checkbox', name='3페이지', exact=True).uncheck()
-    page.get_by_label('입력 파일').select_option('0')
+    page.locator('#pickerFile').select_option('0')
     page.get_by_label('미리보기 크기').select_option('3')
     pw.expect(popup.get_by_role('checkbox', name='10000페이지', exact=True)).to_be_visible()
     page.locator('#pagePickerScroll').evaluate('(el) => el.scrollTop = 0')
@@ -217,7 +217,7 @@ def test_search_survives_review_and_return_to_jobs(screen):
     page.route('**/api/jobs/found', lambda r: r.fulfill(json={'status': {'id': 'found'}, 'results': []}))
     page.goto(url)
     page.locator('#sq').fill('홍길동')
-    page.locator('#sf button').click()
+    page.get_by_role('button', name='검색', exact=True).click()
     pw.expect(page.locator('#sr')).to_contain_text('홍길동')
     page.locator('#sr a').click()
     page.wait_for_url('**/review.html?id=found&page=2')
@@ -226,7 +226,7 @@ def test_search_survives_review_and_return_to_jobs(screen):
     pw.expect(page.locator('#sr')).to_contain_text('홍길동')
     assert len(searches) == 2  # 복귀 시 최신 결과를 다시 조회한다.
     page.locator('#sq').fill('')
-    page.locator('#sf button').click()
+    page.get_by_role('button', name='검색', exact=True).click()
     pw.expect(page.locator('#sr')).not_to_be_visible()
     page.reload()
     pw.expect(page.locator('#sq')).to_have_value('')

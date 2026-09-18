@@ -39,7 +39,7 @@ def test_merge_requires_per_page_choice_and_keeps_both_inputs(screen):
     page.route('**/api/transfer/merge', merge)
     page.goto(url + '/transfer.html')
     page.set_input_files('#importFile', {'name': 'data.hscan', 'mimeType': 'application/octet-stream', 'buffer': b'test'})
-    page.get_by_role('button', name='기존 작업과 합치기').click()
+    page.get_by_role('button', name='기존 작업과 합치기', exact=True).click()
     page.locator('#previewMerge').click()
     pw.expect(page.locator('#runMerge')).to_be_enabled()
     page.locator('#runMerge').click()

@@ -175,7 +175,7 @@ def test_search_opens_matched_page_despite_saved_review_filter(screen):
     page.route('**/api/search?*', lambda r: r.fulfill(json=[
         {'job': 'found', 'page': 18, 'value': '18', 'label': 'Name', 'template': 'a'}]))
     page.locator('#sq').fill('18')
-    page.locator('#sf button').click()
+    page.get_by_role('button', name='검색', exact=True).click()
     page.locator('#sr a').click()
     target = page.locator('.page[data-page="18"] h4')
     pw.expect(target).to_be_in_viewport()
